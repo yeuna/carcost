@@ -66,6 +66,21 @@ export const fuel = pgTable("fuel", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// An insurance payment. `periodMonths` lets a multi-month premium (e.g. a
+// 6-month policy) be spread evenly across months in reports.
+export const insurance = pgTable("insurance", {
+  id: serial("id").primaryKey(),
+  carId: integer("car_id")
+    .notNull()
+    .references(() => cars.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  periodMonths: integer("period_months").notNull().default(1),
+  provider: text("provider"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // A recurring service with a mileage and/or time interval (drives reminders).
 export const serviceSchedules = pgTable("service_schedules", {
   id: serial("id").primaryKey(),
@@ -97,4 +112,5 @@ export type Car = typeof cars.$inferSelect;
 export type Maintenance = typeof maintenance.$inferSelect;
 export type MaintenanceItem = typeof maintenanceItems.$inferSelect;
 export type Fuel = typeof fuel.$inferSelect;
+export type Insurance = typeof insurance.$inferSelect;
 export type ServiceSchedule = typeof serviceSchedules.$inferSelect;

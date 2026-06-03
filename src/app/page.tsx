@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
-import { getCars } from "@/lib/queries";
+import { MonthlySpendChart } from "@/components/MonthlySpendChart";
+import { getCars, getMonthlySpending } from "@/lib/queries";
 import { money, miles } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
-  const cars = await getCars();
+  const [cars, monthly] = await Promise.all([getCars(), getMonthlySpending(12)]);
 
   return (
     <>
@@ -22,6 +23,12 @@ export default async function Dashboard() {
             + Add car
           </Link>
         </div>
+
+        {cars.length > 0 && (
+          <div className="mb-5">
+            <MonthlySpendChart data={monthly} />
+          </div>
+        )}
 
         {cars.length === 0 ? (
           <div className="mt-16 text-center text-zinc-400">

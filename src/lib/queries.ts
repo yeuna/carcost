@@ -5,10 +5,12 @@ import {
   maintenance,
   maintenanceItems,
   fuel,
+  insurance,
   serviceSchedules,
   type Maintenance,
   type MaintenanceItem,
   type Fuel,
+  type Insurance,
 } from "./schema";
 import { computeReminder, num, type Reminder } from "./utils";
 
@@ -47,9 +49,10 @@ export async function getCars() {
 
 // Lightweight summary used on the dashboard.
 export async function getCarSummary(carId: number) {
-  const [maint, fuelRows, schedules] = await Promise.all([
+  const [maint, fuelRows, insuranceRows, schedules] = await Promise.all([
     db.select().from(maintenance).where(eq(maintenance.carId, carId)),
     db.select().from(fuel).where(eq(fuel.carId, carId)),
+    db.select().from(insurance).where(eq(insurance.carId, carId)),
     db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, carId)),
   ]);
 
@@ -63,6 +66,7 @@ export async function getCarSummary(carId: number) {
   let totalSpent = 0;
   for (const m of maint) totalSpent += maintenanceTotal(m, itemsByMaint[m.id] ?? []);
   for (const f of fuelRows) totalSpent += num(f.totalCost);
+  for (const ins of insuranceRows) totalSpent += num(ins.amount);
 
   const reminders = schedules.map((s) =>
     buildScheduleReminder(s, maint, currentOdometer),
@@ -89,9 +93,10 @@ export async function getCarDetail(carId: number) {
   const car = await getCar(carId);
   if (!car) return null;
 
-  const [maint, fuelRows, schedules, allItems] = await Promise.all([
+  const [maint, fuelRows, insuranceRows, schedules, allItems] = await Promise.all([
     db.select().from(maintenance).where(eq(maintenance.carId, carId)).orderBy(desc(maintenance.date), desc(maintenance.odometer)),
     db.select().from(fuel).where(eq(fuel.carId, carId)).orderBy(desc(fuel.date), desc(fuel.odometer)),
+    db.select().from(insurance).where(eq(insurance.carId, carId)).orderBy(desc(insurance.date)),
     db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, carId)).orderBy(asc(serviceSchedules.name)),
     db.select().from(maintenanceItems),
   ]);
@@ -111,12 +116,10 @@ export async function getCarDetail(carId: number) {
     buildScheduleReminder(s, maint, currentOdometer),
   );
 
-  let totalSpent = 0;
-  for (const m of maintenanceList) totalSpent += m.total;
-  for (const f of fuelRows) totalSpent += num(f.totalCost);
-
   const maintenanceSpent = maintenanceList.reduce((a, m) => a + m.total, 0);
   const fuelSpent = fuelRows.reduce((a, f) => a + num(f.totalCost), 0);
+  const insuranceSpent = insuranceRows.reduce((a, i) => a + num(i.amount), 0);
+  const totalSpent = maintenanceSpent + fuelSpent + insuranceSpent;
 
   return {
     car,
@@ -124,10 +127,79 @@ export async function getCarDetail(carId: number) {
     totalSpent,
     maintenanceSpent,
     fuelSpent,
+    insuranceSpent,
     maintenance: maintenanceList,
     fuel: fuelList,
+    insurance: insuranceRows,
     schedules: scheduleList,
   };
+}
+
+export interface MonthlySpend {
+  month: string; // 'YYYY-MM'
+  label: string; // 'Jun'
+  maintenance: number;
+  fuel: number;
+  insurance: number;
+  total: number;
+}
+
+// Total spending per month across all cars for the last `monthsBack` months.
+// Insurance payments are spread evenly across the months they cover.
+export async function getMonthlySpending(monthsBack = 12): Promise<MonthlySpend[]> {
+  const [maint, fuelRows, insuranceRows, allItems] = await Promise.all([
+    db.select().from(maintenance),
+    db.select().from(fuel),
+    db.select().from(insurance),
+    db.select().from(maintenanceItems),
+  ]);
+  const itemsByMaint = groupItems(allItems);
+
+  // Build the ordered list of month buckets ending with the current month.
+  const now = new Date();
+  const buckets: MonthlySpend[] = [];
+  const index: Record<string, MonthlySpend> = {};
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = monthKey(d);
+    const b: MonthlySpend = {
+      month: key,
+      label: d.toLocaleDateString("en-US", { month: "short" }),
+      maintenance: 0,
+      fuel: 0,
+      insurance: 0,
+      total: 0,
+    };
+    buckets.push(b);
+    index[key] = b;
+  }
+
+  for (const m of maint) {
+    const b = index[m.date.slice(0, 7)];
+    if (b) b.maintenance += maintenanceTotal(m, itemsByMaint[m.id] ?? []);
+  }
+  for (const f of fuelRows) {
+    const b = index[f.date.slice(0, 7)];
+    if (b) b.fuel += num(f.totalCost);
+  }
+  // Spread each insurance payment across its coverage period.
+  for (const ins of insuranceRows) {
+    const months = Math.max(1, ins.periodMonths);
+    const perMonth = num(ins.amount) / months;
+    const start = new Date(ins.date.slice(0, 4) + "-" + ins.date.slice(5, 7) + "-01T00:00:00");
+    for (let k = 0; k < months; k++) {
+      const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
+      const b = index[monthKey(d)];
+      if (b) b.insurance += perMonth;
+    }
+  }
+  for (const b of buckets) b.total = b.maintenance + b.fuel + b.insurance;
+
+  return buckets;
+}
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export interface DueService {

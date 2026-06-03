@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { cars, maintenance, maintenanceItems, fuel, serviceSchedules } from "./schema";
+import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules } from "./schema";
 
 function str(form: FormData, key: string): string {
   return String(form.get(key) ?? "").trim();
@@ -134,6 +134,32 @@ export async function deleteFuel(form: FormData) {
   const carId = optInt(form, "carId");
   if (id == null) return;
   await db.delete(fuel).where(eq(fuel.id, id));
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+// --- Insurance ---
+
+export async function createInsurance(form: FormData) {
+  const carId = optInt(form, "carId");
+  if (carId == null) throw new Error("Missing car");
+  await db.insert(insurance).values({
+    carId,
+    date: str(form, "date"),
+    amount: optNum(form, "amount") ?? "0.00",
+    periodMonths: optInt(form, "periodMonths") ?? 1,
+    provider: optStr(form, "provider"),
+    notes: optStr(form, "notes"),
+  });
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+export async function deleteInsurance(form: FormData) {
+  const id = optInt(form, "id");
+  const carId = optInt(form, "carId");
+  if (id == null) return;
+  await db.delete(insurance).where(eq(insurance.id, id));
   revalidatePath(`/cars/${carId}`);
   redirect(`/cars/${carId}`);
 }

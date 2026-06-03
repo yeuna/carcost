@@ -6,6 +6,7 @@ import { getCarDetail } from "@/lib/queries";
 import {
   deleteCar,
   deleteFuel,
+  deleteInsurance,
   deleteMaintenance,
   deleteServiceSchedule,
 } from "@/lib/actions";
@@ -19,7 +20,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
   const data = await getCarDetail(carId);
   if (!data) notFound();
 
-  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, maintenance, fuel, schedules } = data;
+  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, maintenance, fuel, insurance, schedules } = data;
 
   return (
     <>
@@ -29,16 +30,23 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
         <h1 className="text-2xl font-bold">{car.name}</h1>
         <p className="mt-1 text-sm text-zinc-400">Current odometer: {miles(currentOdometer)}</p>
 
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <Stat label="Total" value={money(totalSpent)} />
-          <Stat label="Maintenance" value={money(maintenanceSpent)} />
-          <Stat label="Fuel" value={money(fuelSpent)} />
+        <div className="mt-4 rounded-2xl bg-zinc-900 p-4 ring-1 ring-white/10">
+          <div className="text-center">
+            <div className="text-2xl font-bold">{money(totalSpent)}</div>
+            <div className="text-xs text-zinc-500">total spent</div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-3 border-t border-white/10 pt-3">
+            <MiniStat label="Maintenance" value={money(maintenanceSpent)} />
+            <MiniStat label="Fuel" value={money(fuelSpent)} />
+            <MiniStat label="Insurance" value={money(insuranceSpent)} />
+          </div>
         </div>
 
         {/* Quick actions */}
-        <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="mt-5 grid grid-cols-4 gap-2">
           <Action href={`/cars/${carId}/maintenance/new`} icon="🔧" label="Maintenance" />
           <Action href={`/cars/${carId}/fuel/new`} icon="⛽" label="Fuel" />
+          <Action href={`/cars/${carId}/insurance/new`} icon="🛡️" label="Insurance" />
           <Action href={`/cars/${carId}/services/new`} icon="🗓️" label="Service" />
         </div>
 
@@ -152,6 +160,37 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
           )}
         </Section>
 
+        {/* Insurance log */}
+        <Section title="Insurance" action={{ href: `/cars/${carId}/insurance/new`, label: "+ Add" }}>
+          {insurance.length === 0 ? (
+            <Empty>No insurance payments logged yet.</Empty>
+          ) : (
+            <ul className="space-y-2">
+              {insurance.map((ins) => (
+                <li
+                  key={ins.id}
+                  className="flex items-start justify-between gap-3 rounded-xl bg-zinc-900 p-3 ring-1 ring-white/10"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">{money(ins.amount)}</div>
+                    <div className="mt-0.5 text-xs text-zinc-400">
+                      {formatDate(ins.date)}
+                      {ins.provider && ` · ${ins.provider}`}
+                    </div>
+                    {ins.periodMonths > 1 && (
+                      <div className="text-xs text-zinc-500">
+                        {ins.periodMonths}-month policy · ≈{money(num(ins.amount) / ins.periodMonths)}/mo
+                      </div>
+                    )}
+                    {ins.notes && <p className="mt-1 text-xs text-zinc-500">{ins.notes}</p>}
+                  </div>
+                  <DeleteButton action={deleteInsurance} id={ins.id} carId={carId} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
         {/* Danger zone */}
         <div className="mt-12 border-t border-white/10 pt-6">
           <form action={deleteCar}>
@@ -164,10 +203,10 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-zinc-900 p-3 text-center ring-1 ring-white/10">
-      <div className="truncate text-base font-semibold">{value}</div>
+    <div className="text-center">
+      <div className="truncate text-sm font-semibold">{value}</div>
       <div className="mt-0.5 text-xs text-zinc-500">{label}</div>
     </div>
   );
