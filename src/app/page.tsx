@@ -2,13 +2,17 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MonthlySpendChart } from "@/components/MonthlySpendChart";
-import { getCars, getMonthlySpending } from "@/lib/queries";
-import { money, miles } from "@/lib/utils";
+import { getCars, getMonthlySpending, getRecurringInsuranceConfig } from "@/lib/queries";
+import { money, miles, ordinal } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
-  const [cars, monthly] = await Promise.all([getCars(), getMonthlySpending(12)]);
+  const [cars, monthly, insurance] = await Promise.all([
+    getCars(),
+    getMonthlySpending(12),
+    getRecurringInsuranceConfig(),
+  ]);
 
   return (
     <>
@@ -23,6 +27,40 @@ export default async function Dashboard() {
             + Add car
           </Link>
         </div>
+
+        {/* Insurance due — single account-level banner */}
+        {insurance?.isDue && (
+          <div className="mb-3 rounded-2xl bg-amber-950 ring-1 ring-amber-500/30">
+            <Link
+              href="/insurance/record"
+              className="flex items-center justify-between px-4 py-4 active:bg-amber-900/60"
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-amber-100">Insurance due</div>
+                <div className="mt-0.5 text-sm text-amber-300/80">
+                  {money(insurance.amount)} · due the {ordinal(insurance.dayOfMonth)}
+                  {insurance.provider && ` · ${insurance.provider}`}
+                </div>
+              </div>
+              <span className="ml-3 shrink-0 text-amber-400">Record →</span>
+            </Link>
+            <div className="border-t border-amber-500/10 px-4 py-2 text-right">
+              <Link href="/insurance" className="text-xs text-amber-700 active:text-amber-500">
+                Edit settings
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Setup nudge when no recurring config exists */}
+        {!insurance && (
+          <Link
+            href="/insurance"
+            className="mb-3 block rounded-2xl bg-zinc-900/60 px-4 py-3 text-sm text-zinc-500 ring-1 ring-white/5 active:bg-zinc-900"
+          >
+            Set up monthly insurance reminders →
+          </Link>
+        )}
 
         {cars.length > 0 && (
           <div className="mb-5">

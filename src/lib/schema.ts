@@ -113,6 +113,18 @@ export const odometerReadings = pgTable("odometer_readings", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Account-level recurring insurance config (single row). The monthly payment
+// covers all cars; the due-day prompt appears once per month on or after dayOfMonth.
+// lastPaidMonth ("YYYY-MM") tracks whether this month's payment has been recorded.
+export const recurringInsuranceConfig = pgTable("recurring_insurance_config", {
+  id: serial("id").primaryKey(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  dayOfMonth: integer("day_of_month").notNull().default(24),
+  provider: text("provider"),
+  lastPaidMonth: text("last_paid_month"), // null = never paid
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Brute-force protection: failed-login tracking per client IP.
 export const loginThrottle = pgTable("login_throttle", {
   ip: text("ip").primaryKey(),
@@ -128,3 +140,4 @@ export type Fuel = typeof fuel.$inferSelect;
 export type Insurance = typeof insurance.$inferSelect;
 export type ServiceSchedule = typeof serviceSchedules.$inferSelect;
 export type OdometerReading = typeof odometerReadings.$inferSelect;
+export type RecurringInsuranceConfig = typeof recurringInsuranceConfig.$inferSelect;

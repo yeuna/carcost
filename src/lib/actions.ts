@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings } from "./schema";
+import { num } from "./utils";
+import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings, recurringInsuranceConfig } from "./schema";
 
 function str(form: FormData, key: string): string {
   return String(form.get(key) ?? "").trim();
@@ -43,6 +44,69 @@ export async function createCar(form: FormData) {
     .returning({ id: cars.id });
   revalidatePath("/");
   redirect(`/cars/${rows[0].id}`);
+}
+
+// --- Account-level recurring insurance ---
+
+export async function saveRecurringConfig(form: FormData) {
+  const amount = optNum(form, "amount");
+  const dayOfMonth = optInt(form, "dayOfMonth");
+  if (!amount || !dayOfMonth) throw new Error("Amount and day are required");
+  const provider = optStr(form, "provider");
+
+  const existing = await db
+    .select({ id: recurringInsuranceConfig.id })
+    .from(recurringInsuranceConfig)
+    .limit(1);
+
+  if (existing[0]) {
+    await db
+      .update(recurringInsuranceConfig)
+      .set({ amount, dayOfMonth, provider, updatedAt: new Date() })
+      .where(eq(recurringInsuranceConfig.id, existing[0].id));
+  } else {
+    await db.insert(recurringInsuranceConfig).values({ amount, dayOfMonth, provider });
+  }
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function recordInsurancePayment(_form: FormData) {
+  const [configs, allCars] = await Promise.all([
+    db.select().from(recurringInsuranceConfig).limit(1),
+    db.select().from(cars),
+  ]);
+  const cfg = configs[0];
+  if (!cfg || !allCars.length) return;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const thisMonth = todayStr.slice(0, 7);
+
+  // Split amount evenly; remainder cents go on the first car.
+  const totalCents = Math.round(num(cfg.amount) * 100);
+  const n = allCars.length;
+  const perCarCents = Math.floor(totalCents / n);
+  const remainderCents = totalCents - perCarCents * n;
+
+  await db.insert(insurance).values(
+    allCars.map((car, i) => ({
+      carId: car.id,
+      date: todayStr,
+      amount: ((perCarCents + (i === 0 ? remainderCents : 0)) / 100).toFixed(2),
+      periodMonths: 1,
+      provider: cfg.provider,
+    })),
+  );
+
+  await db
+    .update(recurringInsuranceConfig)
+    .set({ lastPaidMonth: thisMonth })
+    .where(eq(recurringInsuranceConfig.id, cfg.id));
+
+  const paths = ["/", ...allCars.map((c) => `/cars/${c.id}`)];
+  for (const p of paths) revalidatePath(p);
+  redirect("/");
 }
 
 export async function deleteCar(form: FormData) {

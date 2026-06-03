@@ -8,11 +8,13 @@ import {
   insurance,
   serviceSchedules,
   odometerReadings,
+  recurringInsuranceConfig,
   type Maintenance,
   type MaintenanceItem,
   type Fuel,
   type Insurance,
   type OdometerReading,
+  type RecurringInsuranceConfig,
 } from "./schema";
 import { computeReminder, num, type Reminder } from "./utils";
 
@@ -34,6 +36,21 @@ export interface ScheduleWithReminder {
 export interface FuelWithMpg extends Fuel {
   mpg: number | null;
   costPerMile: number | null;
+}
+
+// Returns the account-level recurring insurance config (single row) with an
+// isDue flag indicating whether this month's payment needs to be recorded.
+export async function getRecurringInsuranceConfig(): Promise<
+  (RecurringInsuranceConfig & { isDue: boolean }) | null
+> {
+  const rows = await db.select().from(recurringInsuranceConfig).limit(1);
+  if (!rows[0]) return null;
+  const cfg = rows[0];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayDay = parseInt(todayStr.slice(8, 10), 10);
+  const thisMonth = todayStr.slice(0, 7);
+  const isDue = todayDay >= cfg.dayOfMonth && cfg.lastPaidMonth !== thisMonth;
+  return { ...cfg, isDue };
 }
 
 export async function getCars() {
