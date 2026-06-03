@@ -7,10 +7,12 @@ import {
   fuel,
   insurance,
   serviceSchedules,
+  odometerReadings,
   type Maintenance,
   type MaintenanceItem,
   type Fuel,
   type Insurance,
+  type OdometerReading,
 } from "./schema";
 import { computeReminder, num, type Reminder } from "./utils";
 
@@ -49,11 +51,12 @@ export async function getCars() {
 
 // Lightweight summary used on the dashboard.
 export async function getCarSummary(carId: number) {
-  const [maint, fuelRows, insuranceRows, schedules] = await Promise.all([
+  const [maint, fuelRows, insuranceRows, schedules, odometerRows] = await Promise.all([
     db.select().from(maintenance).where(eq(maintenance.carId, carId)),
     db.select().from(fuel).where(eq(fuel.carId, carId)),
     db.select().from(insurance).where(eq(insurance.carId, carId)),
     db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, carId)),
+    db.select().from(odometerReadings).where(eq(odometerReadings.carId, carId)),
   ]);
 
   const items = maint.length
@@ -61,7 +64,7 @@ export async function getCarSummary(carId: number) {
     : [];
   const itemsByMaint = groupItems(items);
 
-  const currentOdometer = computeCurrentOdometer(maint, fuelRows);
+  const currentOdometer = computeCurrentOdometer(maint, fuelRows, odometerRows);
 
   let totalSpent = 0;
   for (const m of maint) totalSpent += maintenanceTotal(m, itemsByMaint[m.id] ?? []);
@@ -93,16 +96,17 @@ export async function getCarDetail(carId: number) {
   const car = await getCar(carId);
   if (!car) return null;
 
-  const [maint, fuelRows, insuranceRows, schedules, allItems] = await Promise.all([
+  const [maint, fuelRows, insuranceRows, schedules, allItems, odometerRows] = await Promise.all([
     db.select().from(maintenance).where(eq(maintenance.carId, carId)).orderBy(desc(maintenance.date), desc(maintenance.odometer)),
     db.select().from(fuel).where(eq(fuel.carId, carId)).orderBy(desc(fuel.date), desc(fuel.odometer)),
     db.select().from(insurance).where(eq(insurance.carId, carId)).orderBy(desc(insurance.date)),
     db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, carId)).orderBy(asc(serviceSchedules.name)),
     db.select().from(maintenanceItems),
+    db.select().from(odometerReadings).where(eq(odometerReadings.carId, carId)).orderBy(desc(odometerReadings.date), desc(odometerReadings.odometer)),
   ]);
 
   const itemsByMaint = groupItems(allItems);
-  const currentOdometer = computeCurrentOdometer(maint, fuelRows);
+  const currentOdometer = computeCurrentOdometer(maint, fuelRows, odometerRows);
 
   const maintenanceList: MaintenanceWithItems[] = maint.map((m) => ({
     ...m,
@@ -132,6 +136,7 @@ export async function getCarDetail(carId: number) {
     fuel: fuelList,
     insurance: insuranceRows,
     schedules: scheduleList,
+    odometerReadings: odometerRows,
   };
 }
 
@@ -220,12 +225,13 @@ export async function getDueServices(): Promise<DueService[]> {
   const out: DueService[] = [];
 
   for (const car of allCars) {
-    const [maint, fuelRows, schedules] = await Promise.all([
+    const [maint, fuelRows, schedules, odometerRows] = await Promise.all([
       db.select().from(maintenance).where(eq(maintenance.carId, car.id)),
       db.select().from(fuel).where(eq(fuel.carId, car.id)),
       db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, car.id)),
+      db.select().from(odometerReadings).where(eq(odometerReadings.carId, car.id)),
     ]);
-    const currentOdometer = computeCurrentOdometer(maint, fuelRows);
+    const currentOdometer = computeCurrentOdometer(maint, fuelRows, odometerRows);
 
     for (const s of schedules) {
       const r = buildScheduleReminder(s, maint, currentOdometer);
@@ -301,10 +307,15 @@ function maintenanceTotal(m: Maintenance, items: MaintenanceItem[]): number {
   return parts + num(m.laborCost);
 }
 
-function computeCurrentOdometer(maint: Maintenance[], fuelRows: Fuel[]): number | null {
+function computeCurrentOdometer(
+  maint: Maintenance[],
+  fuelRows: Fuel[],
+  odometerRows: OdometerReading[] = [],
+): number | null {
   let max: number | null = null;
   for (const m of maint) if (max == null || m.odometer > max) max = m.odometer;
   for (const f of fuelRows) if (max == null || f.odometer > max) max = f.odometer;
+  for (const o of odometerRows) if (max == null || o.odometer > max) max = o.odometer;
   return max;
 }
 

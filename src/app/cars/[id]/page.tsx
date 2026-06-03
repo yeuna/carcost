@@ -8,6 +8,7 @@ import {
   deleteFuel,
   deleteInsurance,
   deleteMaintenance,
+  deleteOdometerReading,
   deleteServiceSchedule,
 } from "@/lib/actions";
 import { money, miles, formatDate, num } from "@/lib/utils";
@@ -20,7 +21,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
   const data = await getCarDetail(carId);
   if (!data) notFound();
 
-  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, maintenance, fuel, insurance, schedules } = data;
+  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, maintenance, fuel, insurance, schedules, odometerReadings } = data;
 
   return (
     <>
@@ -43,11 +44,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* Quick actions */}
-        <div className="mt-5 grid grid-cols-4 gap-2">
+        <div className="mt-5 grid grid-cols-5 gap-2">
           <Action href={`/cars/${carId}/maintenance/new`} icon="🔧" label="Maintenance" />
           <Action href={`/cars/${carId}/fuel/new`} icon="⛽" label="Fuel" />
           <Action href={`/cars/${carId}/insurance/new`} icon="🛡️" label="Insurance" />
           <Action href={`/cars/${carId}/services/new`} icon="🗓️" label="Service" />
+          <Action href={`/cars/${carId}/odometer/new`} icon="📍" label="Odometer" />
         </div>
 
         {/* Services due */}
@@ -205,6 +207,27 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
             </ul>
           )}
         </Section>
+
+        {/* Odometer readings */}
+        {odometerReadings.length > 0 && (
+          <Section title="Odometer readings" action={{ href: `/cars/${carId}/odometer/new`, label: "+ Log" }}>
+            <ul className="space-y-2">
+              {odometerReadings.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex items-start justify-between gap-3 rounded-xl bg-zinc-900 p-3 ring-1 ring-white/10"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">{miles(o.odometer)}</div>
+                    <div className="mt-0.5 text-xs text-zinc-400">{formatDate(o.date)}</div>
+                    {o.notes && <p className="mt-1 text-xs text-zinc-500">{o.notes}</p>}
+                  </div>
+                  <DeleteButton action={deleteOdometerReading} id={o.id} carId={carId} />
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         {/* Danger zone */}
         <div className="mt-12 border-t border-white/10 pt-6">

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules } from "./schema";
+import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings } from "./schema";
 
 function str(form: FormData, key: string): string {
   return String(form.get(key) ?? "").trim();
@@ -243,6 +243,30 @@ export async function deleteInsurance(form: FormData) {
   const carId = optInt(form, "carId");
   if (id == null) return;
   await db.delete(insurance).where(eq(insurance.id, id));
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+// --- Odometer readings ---
+
+export async function createOdometerReading(form: FormData) {
+  const carId = optInt(form, "carId");
+  if (carId == null) throw new Error("Missing car");
+  await db.insert(odometerReadings).values({
+    carId,
+    date: str(form, "date"),
+    odometer: optInt(form, "odometer") ?? 0,
+    notes: optStr(form, "notes"),
+  });
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+export async function deleteOdometerReading(form: FormData) {
+  const id = optInt(form, "id");
+  const carId = optInt(form, "carId");
+  if (id == null) return;
+  await db.delete(odometerReadings).where(eq(odometerReadings.id, id));
   revalidatePath(`/cars/${carId}`);
   redirect(`/cars/${carId}`);
 }

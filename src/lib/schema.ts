@@ -100,6 +100,19 @@ export const serviceSchedules = pgTable("service_schedules", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// A standalone odometer reading — lets the current mileage be tracked without
+// needing a maintenance or fuel entry.
+export const odometerReadings = pgTable("odometer_readings", {
+  id: serial("id").primaryKey(),
+  carId: integer("car_id")
+    .notNull()
+    .references(() => cars.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  odometer: integer("odometer").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Brute-force protection: failed-login tracking per client IP.
 export const loginThrottle = pgTable("login_throttle", {
   ip: text("ip").primaryKey(),
@@ -114,3 +127,4 @@ export type MaintenanceItem = typeof maintenanceItems.$inferSelect;
 export type Fuel = typeof fuel.$inferSelect;
 export type Insurance = typeof insurance.$inferSelect;
 export type ServiceSchedule = typeof serviceSchedules.$inferSelect;
+export type OdometerReading = typeof odometerReadings.$inferSelect;
