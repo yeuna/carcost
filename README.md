@@ -3,6 +3,9 @@
 A simple, mobile-first web app to track maintenance and fuel costs across all your
 cars. Built for a single user (you), password-protected, and hosted on Vercel.
 
+<!-- Deployed automatically from main via Vercel's GitHub integration. -->
+
+
 ## Features
 
 - **Multiple cars** — add as many as you want, switch between them easily.
