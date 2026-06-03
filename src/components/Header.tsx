@@ -13,9 +13,14 @@ export function Header({ back }: { back?: { href: string; label: string } }) {
             <span>🚗</span> CarCost
           </Link>
         )}
-        <form action="/api/logout" method="POST">
-          <button className="text-sm text-zinc-500 active:text-white">Log out</button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/settings" className="text-base text-zinc-500 active:text-white" aria-label="Settings">
+            ⚙
+          </Link>
+          <form action="/api/logout" method="POST">
+            <button className="text-sm text-zinc-500 active:text-white">Log out</button>
+          </form>
+        </div>
       </div>
     </header>
   );

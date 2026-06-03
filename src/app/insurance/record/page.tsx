@@ -85,16 +85,15 @@ export default async function RecordInsurancePage() {
           )}
         </div>
 
-        {n === 0 && (
-          <p className="mt-4 text-sm text-zinc-500">
-            Add a car first — the payment will be split across all your cars.
+        {n === 0 ? (
+          <p className="mt-6 rounded-xl bg-zinc-900/60 px-4 py-4 text-sm text-zinc-400 ring-1 ring-white/5">
+            Add a car first — the payment will be split across all your cars once you do.
           </p>
+        ) : (
+          <form action={recordInsurancePayment} className="mt-6">
+            <SubmitButton>Record payment</SubmitButton>
+          </form>
         )}
-
-        {/* Confirm */}
-        <form action={recordInsurancePayment} className="mt-6">
-          <SubmitButton>Record payment</SubmitButton>
-        </form>
 
         <div className="mt-5 text-center">
           <Link href="/" className="text-base text-zinc-500 active:text-zinc-300">

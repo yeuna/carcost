@@ -45,7 +45,7 @@ export default async function Dashboard() {
               <span className="ml-3 shrink-0 text-amber-400">Record →</span>
             </Link>
             <div className="border-t border-amber-500/10 px-4 py-2 text-right">
-              <Link href="/insurance" className="text-xs text-amber-700 active:text-amber-500">
+              <Link href="/settings" className="text-xs text-amber-700 active:text-amber-500">
                 Edit settings
               </Link>
             </div>
@@ -55,7 +55,7 @@ export default async function Dashboard() {
         {/* Setup nudge when no recurring config exists */}
         {!insurance && (
           <Link
-            href="/insurance"
+            href="/settings"
             className="mb-3 block rounded-2xl bg-zinc-900/60 px-4 py-3 text-sm text-zinc-500 ring-1 ring-white/5 active:bg-zinc-900"
           >
             Set up monthly insurance reminders →

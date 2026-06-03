@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { num } from "./utils";
 import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings, recurringInsuranceConfig } from "./schema";
@@ -50,8 +50,10 @@ export async function createCar(form: FormData) {
 
 export async function saveRecurringConfig(form: FormData) {
   const amount = optNum(form, "amount");
-  const dayOfMonth = optInt(form, "dayOfMonth");
-  if (!amount || !dayOfMonth) throw new Error("Amount and day are required");
+  const rawDay = optInt(form, "dayOfMonth");
+  if (!amount || !rawDay) throw new Error("Amount and day are required");
+  // Clamp to 1–28: days 29-31 silently skip months shorter than that day.
+  const dayOfMonth = Math.min(28, Math.max(1, rawDay));
   const provider = optStr(form, "provider");
 
   const existing = await db
@@ -69,7 +71,8 @@ export async function saveRecurringConfig(form: FormData) {
   }
 
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/settings");
+  redirect("/settings");
 }
 
 export async function recordInsurancePayment(_form: FormData) {
@@ -78,7 +81,7 @@ export async function recordInsurancePayment(_form: FormData) {
     db.select().from(cars),
   ]);
   const cfg = configs[0];
-  if (!cfg || !allCars.length) return;
+  if (!cfg || !allCars.length) redirect("/");
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const thisMonth = todayStr.slice(0, 7);
@@ -207,7 +210,6 @@ export async function updateMaintenance(form: FormData) {
     .where(eq(maintenance.id, id));
 
   if (type === "diy") {
-    await db.delete(maintenanceItems).where(eq(maintenanceItems.maintenanceId, id));
     const names = form.getAll("itemName").map((v) => String(v).trim());
     const costs = form.getAll("itemCost").map((v) => String(v).trim());
     const qtys = form.getAll("itemQty").map((v) => String(v).trim());
@@ -225,7 +227,21 @@ export async function updateMaintenance(form: FormData) {
         quantity: isNaN(qty) || qty < 1 ? 1 : qty,
       });
     }
+    // Fetch existing item IDs so we can target the delete precisely.
+    // Insert new items first: if the insert fails, old items are still intact.
+    // If the delete fails after a successful insert, the user sees duplicate
+    // items (correctable by re-editing) rather than losing all items.
+    // The HTTP driver does not support transactions, so this is the safest ordering.
+    const existing = await db
+      .select({ id: maintenanceItems.id })
+      .from(maintenanceItems)
+      .where(eq(maintenanceItems.maintenanceId, id));
     if (toInsert.length) await db.insert(maintenanceItems).values(toInsert);
+    if (existing.length) {
+      await db
+        .delete(maintenanceItems)
+        .where(inArray(maintenanceItems.id, existing.map((r) => r.id)));
+    }
   }
 
   revalidatePath(`/cars/${carId}`);
@@ -347,6 +363,7 @@ export async function markServiceDone(form: FormData) {
     title,
     scheduleId,
   });
+  revalidatePath("/");
   revalidatePath(`/cars/${carId}`);
   redirect(`/cars/${carId}`);
 }
