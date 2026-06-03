@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #09090b; /* zinc-950 */
+  color: #fafafa;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Larger, comfortable tap targets on mobile inputs */
+input,
+select,
+textarea,
+button {
+  font-size: 16px; /* prevents iOS zoom on focus */
+}
