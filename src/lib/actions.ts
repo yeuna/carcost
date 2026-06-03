@@ -109,6 +109,26 @@ export async function recordInsurancePayment(_form: FormData) {
   redirect("/");
 }
 
+export async function updateCar(form: FormData) {
+  const id = optInt(form, "id");
+  const name = str(form, "name");
+  if (id == null) throw new Error("Missing id");
+  if (!name) throw new Error("Name is required");
+  await db
+    .update(cars)
+    .set({
+      name,
+      make: optStr(form, "make"),
+      model: optStr(form, "model"),
+      year: optInt(form, "year"),
+      color: optStr(form, "color"),
+    })
+    .where(eq(cars.id, id));
+  revalidatePath("/");
+  revalidatePath(`/cars/${id}`);
+  redirect(`/cars/${id}`);
+}
+
 export async function deleteCar(form: FormData) {
   const id = optInt(form, "id");
   if (id == null) return;
@@ -307,6 +327,26 @@ export async function deleteInsurance(form: FormData) {
   const carId = optInt(form, "carId");
   if (id == null) return;
   await db.delete(insurance).where(eq(insurance.id, id));
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+// --- Service schedule: mark done ---
+
+export async function markServiceDone(form: FormData) {
+  const carId = optInt(form, "carId");
+  const scheduleId = optInt(form, "scheduleId");
+  const odometer = optInt(form, "odometer") ?? 0;
+  const title = str(form, "title") || "Service";
+  if (carId == null || scheduleId == null) throw new Error("Missing data");
+  await db.insert(maintenance).values({
+    carId,
+    date: new Date().toISOString().slice(0, 10),
+    odometer,
+    type: "diy",
+    title,
+    scheduleId,
+  });
   revalidatePath(`/cars/${carId}`);
   redirect(`/cars/${carId}`);
 }

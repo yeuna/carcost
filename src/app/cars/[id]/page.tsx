@@ -10,6 +10,7 @@ import {
   deleteMaintenance,
   deleteOdometerReading,
   deleteServiceSchedule,
+  markServiceDone,
 } from "@/lib/actions";
 import { money, miles, formatDate, num } from "@/lib/utils";
 
@@ -28,8 +29,15 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
       <Header back={{ href: "/", label: "Cars" }} />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
         {/* Heading + stats */}
-        <h1 className="text-2xl font-bold">{car.name}</h1>
-        <p className="mt-1 text-sm text-zinc-400">Current odometer: {miles(currentOdometer)}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-bold">{car.name}</h1>
+            <p className="mt-1 text-sm text-zinc-400">Current odometer: {miles(currentOdometer)}</p>
+          </div>
+          <Link href={`/cars/${carId}/edit`} className="shrink-0 text-sm text-blue-400 active:text-blue-300">
+            Edit
+          </Link>
+        </div>
 
         <div className="mt-4 rounded-2xl bg-zinc-900 p-4 ring-1 ring-white/10">
           <div className="text-center">
@@ -61,7 +69,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
               {schedules.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-zinc-900 p-3 ring-1 ring-white/10"
+                  className="flex items-start justify-between gap-3 rounded-xl bg-zinc-900 p-3 ring-1 ring-white/10"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -78,7 +86,22 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                       </div>
                     )}
                   </div>
-                  <DeleteButton action={deleteServiceSchedule} id={s.id} carId={carId} />
+                  <div className="shrink-0 flex flex-col items-end gap-2">
+                    <form action={markServiceDone}>
+                      <input type="hidden" name="carId" value={carId} />
+                      <input type="hidden" name="scheduleId" value={s.id} />
+                      <input type="hidden" name="odometer" value={currentOdometer ?? 0} />
+                      <input type="hidden" name="title" value={s.name} />
+                      <button className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-white/10 active:bg-zinc-700">
+                        ✓ Done
+                      </button>
+                    </form>
+                    <form action={deleteServiceSchedule}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="carId" value={carId} />
+                      <button className="text-xs text-zinc-600 active:text-red-400">Delete</button>
+                    </form>
+                  </div>
                 </li>
               ))}
             </ul>
