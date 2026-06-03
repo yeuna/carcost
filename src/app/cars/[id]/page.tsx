@@ -120,7 +120,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="font-semibold">{money(m.total)}</div>
-                      <DeleteButton action={deleteMaintenance} id={m.id} carId={carId} />
+                      <DeleteButton
+                        action={deleteMaintenance}
+                        id={m.id}
+                        carId={carId}
+                        editHref={`/cars/${carId}/maintenance/${m.id}/edit`}
+                      />
                     </div>
                   </div>
                 </li>
@@ -153,7 +158,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                       {f.partialFill && " · partial"}
                     </div>
                   </div>
-                  <DeleteButton action={deleteFuel} id={f.id} carId={carId} />
+                  <DeleteButton
+                    action={deleteFuel}
+                    id={f.id}
+                    carId={carId}
+                    editHref={`/cars/${carId}/fuel/${f.id}/edit`}
+                  />
                 </li>
               ))}
             </ul>
@@ -184,7 +194,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     )}
                     {ins.notes && <p className="mt-1 text-xs text-zinc-500">{ins.notes}</p>}
                   </div>
-                  <DeleteButton action={deleteInsurance} id={ins.id} carId={carId} />
+                  <DeleteButton
+                    action={deleteInsurance}
+                    id={ins.id}
+                    carId={carId}
+                    editHref={`/cars/${carId}/insurance/${ins.id}/edit`}
+                  />
                 </li>
               ))}
             </ul>
@@ -260,22 +275,28 @@ function DeleteButton({
   action,
   id,
   carId,
+  editHref,
 }: {
   action: (form: FormData) => void;
   id: number;
   carId: number;
+  editHref?: string;
 }) {
   return (
-    <form action={action} className="mt-1">
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="carId" value={carId} />
-      <button
-        className="text-xs text-zinc-600 active:text-red-400"
-        aria-label="Delete"
-      >
-        Delete
-      </button>
-    </form>
+    <div className="mt-1 flex flex-col items-end gap-1">
+      {editHref && (
+        <Link href={editHref} className="text-xs text-zinc-500 active:text-blue-300">
+          Edit
+        </Link>
+      )}
+      <form action={action}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="carId" value={carId} />
+        <button className="text-xs text-zinc-600 active:text-red-400" aria-label="Delete">
+          Delete
+        </button>
+      </form>
+    </div>
   );
 }
 

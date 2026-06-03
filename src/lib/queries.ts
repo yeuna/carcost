@@ -246,6 +246,23 @@ export async function getDueServices(): Promise<DueService[]> {
   return out;
 }
 
+export async function getMaintenanceEntry(id: number): Promise<MaintenanceWithItems | null> {
+  const rows = await db.select().from(maintenance).where(eq(maintenance.id, id)).limit(1);
+  if (!rows[0]) return null;
+  const items = await db.select().from(maintenanceItems).where(eq(maintenanceItems.maintenanceId, id));
+  return { ...rows[0], items, total: maintenanceTotal(rows[0], items) };
+}
+
+export async function getFuelEntry(id: number): Promise<Fuel | null> {
+  const rows = await db.select().from(fuel).where(eq(fuel.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getInsuranceEntry(id: number): Promise<Insurance | null> {
+  const rows = await db.select().from(insurance).where(eq(insurance.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function markNotified(scheduleId: number, status: string) {
   await db
     .update(serviceSchedules)

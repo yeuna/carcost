@@ -2,26 +2,55 @@
 
 import { useState } from "react";
 import { inputClass, labelClass, Field, SubmitButton } from "@/components/Form";
-import { createMaintenance } from "@/lib/actions";
 import { money } from "@/lib/utils";
 
 type ItemRow = { key: number; name: string; qty: string; cost: string };
 
+type MaintenanceEntry = {
+  id: number;
+  type: string;
+  title: string;
+  date: string;
+  odometer: number;
+  shop: string | null;
+  laborCost: string | null;
+  notes: string | null;
+  scheduleId: number | null;
+  items: Array<{ id: number; name: string; cost: string; quantity: number }>;
+};
+
 export function MaintenanceForm({
   carId,
-  today,
+  today = "",
   schedules,
+  action,
+  entry,
 }: {
   carId: number;
-  today: string;
+  today?: string;
   schedules: { id: number; name: string }[];
+  action: (form: FormData) => void;
+  entry?: MaintenanceEntry;
 }) {
-  const [type, setType] = useState<"diy" | "dealer">("diy");
-  const [items, setItems] = useState<ItemRow[]>([
-    { key: 1, name: "", qty: "1", cost: "" },
-  ]);
-  const [labor, setLabor] = useState("");
-  const [dealerCost, setDealerCost] = useState("");
+  const [type, setType] = useState<"diy" | "dealer">(
+    entry?.type === "dealer" ? "dealer" : "diy",
+  );
+  const [items, setItems] = useState<ItemRow[]>(
+    entry?.items.length
+      ? entry.items.map((it) => ({
+          key: it.id,
+          name: it.name,
+          qty: String(it.quantity),
+          cost: String(it.cost),
+        }))
+      : [{ key: 1, name: "", qty: "1", cost: "" }],
+  );
+  const [labor, setLabor] = useState(
+    entry?.type === "diy" ? String(entry.laborCost ?? "") : "",
+  );
+  const [dealerCost, setDealerCost] = useState(
+    entry?.type === "dealer" ? String(entry.laborCost ?? "") : "",
+  );
 
   function updateItem(key: number, patch: Partial<ItemRow>) {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
@@ -42,9 +71,10 @@ export function MaintenanceForm({
     type === "diy" ? partsTotal + (parseFloat(labor) || 0) : parseFloat(dealerCost) || 0;
 
   return (
-    <form action={createMaintenance} className="space-y-4">
+    <form action={action} className="space-y-4">
       <input type="hidden" name="carId" value={carId} />
       <input type="hidden" name="type" value={type} />
+      {entry && <input type="hidden" name="entryId" value={entry.id} />}
 
       {/* Type toggle */}
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-900 p-1 ring-1 ring-white/10">
@@ -63,15 +93,34 @@ export function MaintenanceForm({
       </div>
 
       <Field label="What was done">
-        <input name="title" required className={inputClass} placeholder={type === "diy" ? "Oil change" : "30k service"} />
+        <input
+          name="title"
+          required
+          defaultValue={entry?.title ?? ""}
+          className={inputClass}
+          placeholder={type === "diy" ? "Oil change" : "30k service"}
+        />
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date">
-          <input type="date" name="date" defaultValue={today} required className={inputClass} />
+          <input
+            type="date"
+            name="date"
+            defaultValue={entry?.date ?? today}
+            required
+            className={inputClass}
+          />
         </Field>
         <Field label="Odometer">
-          <input name="odometer" inputMode="numeric" required className={inputClass} placeholder="miles" />
+          <input
+            name="odometer"
+            inputMode="numeric"
+            required
+            defaultValue={entry ? String(entry.odometer) : ""}
+            className={inputClass}
+            placeholder="miles"
+          />
         </Field>
       </div>
 
@@ -139,7 +188,12 @@ export function MaintenanceForm({
       ) : (
         <>
           <Field label="Shop">
-            <input name="shop" className={inputClass} placeholder="Honda of Anytown" />
+            <input
+              name="shop"
+              defaultValue={entry?.shop ?? ""}
+              className={inputClass}
+              placeholder="Honda of Anytown"
+            />
           </Field>
           <Field label="Total cost">
             <input
@@ -157,7 +211,11 @@ export function MaintenanceForm({
 
       {schedules.length > 0 && (
         <Field label="Counts as service (optional)" hint="Resets that service's mileage reminder.">
-          <select name="scheduleId" className={inputClass} defaultValue="">
+          <select
+            name="scheduleId"
+            className={inputClass}
+            defaultValue={entry?.scheduleId != null ? String(entry.scheduleId) : ""}
+          >
             <option value="">— None —</option>
             {schedules.map((s) => (
               <option key={s.id} value={s.id}>
@@ -169,7 +227,13 @@ export function MaintenanceForm({
       )}
 
       <Field label="Notes (optional)">
-        <textarea name="notes" rows={2} className={inputClass} placeholder="Anything worth remembering" />
+        <textarea
+          name="notes"
+          rows={2}
+          defaultValue={entry?.notes ?? ""}
+          className={inputClass}
+          placeholder="Anything worth remembering"
+        />
       </Field>
 
       <div className="flex items-center justify-between rounded-xl bg-zinc-900 px-4 py-3 ring-1 ring-white/10">
@@ -177,7 +241,7 @@ export function MaintenanceForm({
         <span className="text-lg font-semibold">{money(total)}</span>
       </div>
 
-      <SubmitButton>Save entry</SubmitButton>
+      <SubmitButton>{entry ? "Save changes" : "Save entry"}</SubmitButton>
     </form>
   );
 }

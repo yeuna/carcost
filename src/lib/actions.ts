@@ -102,6 +102,52 @@ export async function createMaintenance(form: FormData) {
   redirect(`/cars/${carId}`);
 }
 
+export async function updateMaintenance(form: FormData) {
+  const id = optInt(form, "entryId");
+  const carId = optInt(form, "carId");
+  if (id == null || carId == null) throw new Error("Missing id");
+  const type = str(form, "type") === "dealer" ? "dealer" : "diy";
+
+  await db
+    .update(maintenance)
+    .set({
+      date: str(form, "date"),
+      odometer: optInt(form, "odometer") ?? 0,
+      type,
+      title: str(form, "title") || "Service",
+      shop: type === "dealer" ? optStr(form, "shop") : null,
+      laborCost: optNum(form, "laborCost"),
+      notes: optStr(form, "notes"),
+      scheduleId: optInt(form, "scheduleId"),
+    })
+    .where(eq(maintenance.id, id));
+
+  if (type === "diy") {
+    await db.delete(maintenanceItems).where(eq(maintenanceItems.maintenanceId, id));
+    const names = form.getAll("itemName").map((v) => String(v).trim());
+    const costs = form.getAll("itemCost").map((v) => String(v).trim());
+    const qtys = form.getAll("itemQty").map((v) => String(v).trim());
+    const toInsert = [];
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      const costRaw = costs[i] ?? "";
+      if (!name && !costRaw) continue;
+      const cost = parseFloat(costRaw.replace(/[^0-9.-]/g, ""));
+      const qty = parseInt((qtys[i] ?? "1").replace(/[^0-9]/g, ""), 10);
+      toInsert.push({
+        maintenanceId: id,
+        name: name || "Item",
+        cost: (isNaN(cost) ? 0 : cost).toFixed(2),
+        quantity: isNaN(qty) || qty < 1 ? 1 : qty,
+      });
+    }
+    if (toInsert.length) await db.insert(maintenanceItems).values(toInsert);
+  }
+
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
 export async function deleteMaintenance(form: FormData) {
   const id = optInt(form, "id");
   const carId = optInt(form, "carId");
@@ -129,6 +175,25 @@ export async function createFuel(form: FormData) {
   redirect(`/cars/${carId}`);
 }
 
+export async function updateFuel(form: FormData) {
+  const id = optInt(form, "entryId");
+  const carId = optInt(form, "carId");
+  if (id == null || carId == null) throw new Error("Missing id");
+  await db
+    .update(fuel)
+    .set({
+      date: str(form, "date"),
+      odometer: optInt(form, "odometer") ?? 0,
+      gallons: optNum(form, "gallons"),
+      totalCost: optNum(form, "totalCost") ?? "0.00",
+      partialFill: str(form, "partialFill") === "on",
+      notes: optStr(form, "notes"),
+    })
+    .where(eq(fuel.id, id));
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
 export async function deleteFuel(form: FormData) {
   const id = optInt(form, "id");
   const carId = optInt(form, "carId");
@@ -151,6 +216,24 @@ export async function createInsurance(form: FormData) {
     provider: optStr(form, "provider"),
     notes: optStr(form, "notes"),
   });
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+export async function updateInsurance(form: FormData) {
+  const id = optInt(form, "entryId");
+  const carId = optInt(form, "carId");
+  if (id == null || carId == null) throw new Error("Missing id");
+  await db
+    .update(insurance)
+    .set({
+      date: str(form, "date"),
+      amount: optNum(form, "amount") ?? "0.00",
+      periodMonths: optInt(form, "periodMonths") ?? 1,
+      provider: optStr(form, "provider"),
+      notes: optStr(form, "notes"),
+    })
+    .where(eq(insurance.id, id));
   revalidatePath(`/cars/${carId}`);
   redirect(`/cars/${carId}`);
 }
