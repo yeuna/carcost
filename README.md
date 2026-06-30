@@ -15,8 +15,18 @@ cars. Built for a single user (you), password-protected, and hosted on Vercel.
 - **Service reminders** — define services per car with a mileage and/or time
   interval (e.g. *Oil change every 5,000 mi / 6 mo*). The app shows
   **due soon / overdue** based on your latest odometer reading.
+- **Renewal reminders** — date-based recurring renewals per car (registration,
+  emissions/safety inspection, road tax). CarCost flags them **due soon / overdue**,
+  includes them in the daily reminder email, and rolls the due date forward by the
+  interval when you mark one renewed.
 - **Fuel log** — record each fill-up's cost (and optional gallons to auto-calc
   **MPG** and **cost-per-mile**).
+- **Cost insights** — per car, an all-in **cost-per-mile** (maintenance + fuel +
+  insurance ÷ miles driven), an **average monthly** spend, and a **projected
+  yearly** cost, with a bar showing how each category contributes per mile. The
+  dashboard shows cost/mile and $/mo on every car so you can compare them.
+- **Fuel economy chart** — MPG over time per car, with average, best, and average
+  cost-per-gallon, so a slipping figure is easy to spot.
 - **Spend totals** — per car and broken down by maintenance vs. fuel.
 - **Password protected** — one password you set; you stay logged in on your phone.
 
@@ -84,8 +94,8 @@ npm install
 npm run db:push
 ```
 
-This creates the `cars`, `maintenance`, `maintenance_items`, `fuel`, and
-`service_schedules` tables.
+This creates the `cars`, `maintenance`, `maintenance_items`, `fuel`,
+`service_schedules`, `renewals`, and the remaining supporting tables.
 
 ## 4. Run locally
 
@@ -133,7 +143,8 @@ Open <http://localhost:3000>, log in with `APP_PASSWORD`, and add your first car
 ## Email service reminders
 
 A daily cron job (`vercel.json` → `/api/cron/check-services`) checks every car's
-service schedules and emails you a digest of anything **due soon or overdue**.
+service schedules **and renewals** (registration, inspection, tax) and emails you
+a digest of anything **due soon or overdue**.
 
 - **Setup:** create a free account at [resend.com](https://resend.com), make an
   API key, and set `RESEND_API_KEY` + `NOTIFY_EMAIL`. On Resend's free tier the

@@ -16,6 +16,13 @@ export function miles(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US").format(value) + " mi";
 }
 
+// Cost per mile is usually under a dollar, so show cents (e.g. "43.2¢/mi"),
+// falling back to dollars for higher figures.
+export function perMile(value: number): string {
+  if (value < 1) return `${(value * 100).toFixed(1)}¢/mi`;
+  return `${money(value)}/mi`;
+}
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value + "T00:00:00") : value;
@@ -30,6 +37,16 @@ export function addMonths(dateStr: string, months: number): Date {
   const d = new Date(dateStr + "T00:00:00");
   d.setMonth(d.getMonth() + months);
   return d;
+}
+
+// addMonths but returns a local "YYYY-MM-DD" string (avoids the UTC day-shift
+// that toISOString would introduce in western timezones).
+export function addMonthsStr(dateStr: string, months: number): string {
+  const d = addMonths(dateStr, months);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function today(): string {
@@ -108,4 +125,30 @@ export function computeReminder(opts: {
   if (parts.length) label = parts.join(" · ");
 
   return { status, milesRemaining, dueOdometer, daysRemaining, dueDate, label };
+}
+
+// Renewals are purely date-driven. A wider "soon" window than services makes
+// sense — registration/inspection renewals are usually handled weeks ahead.
+const RENEWAL_SOON_DAYS = 30;
+
+export interface RenewalReminder {
+  status: ReminderStatus; // overdue | soon | ok
+  daysRemaining: number;
+  label: string;
+}
+
+export function computeRenewalReminder(dueDate: string): RenewalReminder {
+  const due = new Date(dueDate + "T00:00:00").getTime();
+  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const daysRemaining = Math.round((due - today) / (1000 * 60 * 60 * 24));
+
+  const status: ReminderStatus =
+    daysRemaining <= 0 ? "overdue" : daysRemaining <= RENEWAL_SOON_DAYS ? "soon" : "ok";
+
+  let label: string;
+  if (daysRemaining < 0) label = `${-daysRemaining}d overdue`;
+  else if (daysRemaining === 0) label = "due today";
+  else label = `${daysRemaining}d left`;
+
+  return { status, daysRemaining, label };
 }
