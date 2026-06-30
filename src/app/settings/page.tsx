@@ -17,7 +17,8 @@ export default async function SettingsPage({
   const notifyEmail = process.env.NOTIFY_EMAIL;
   const resendConfigured = !!process.env.RESEND_API_KEY;
   const emailReady = !!(notifyEmail && resendConfigured);
-  const blobConfigured = !!process.env.BLOB_READ_WRITE_TOKEN;
+  const blobConfigured =
+    !!process.env.BLOB_STORE_ID || !!process.env.BLOB_READ_WRITE_TOKEN;
 
   return (
     <>
@@ -140,8 +141,8 @@ export default async function SettingsPage({
             </div>
             {!blobConfigured && (
               <p className="mt-2 text-xs text-zinc-600">
-                Provision a Vercel Blob store to enable scheduled backups — it sets{" "}
-                <code className="text-zinc-500">BLOB_READ_WRITE_TOKEN</code> automatically.
+                Connect a Vercel Blob store to enable scheduled backups — it sets{" "}
+                <code className="text-zinc-500">BLOB_STORE_ID</code> automatically.
               </p>
             )}
           </div>

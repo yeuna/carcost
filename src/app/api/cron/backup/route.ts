@@ -20,12 +20,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
+  // The @vercel/blob SDK authenticates from the environment: on Vercel it uses the
+  // auto-injected OIDC token + BLOB_STORE_ID (set when the Blob store is connected),
+  // or falls back to BLOB_READ_WRITE_TOKEN. If neither is present (e.g. local dev
+  // without `vercel env pull`), skip storing rather than error.
+  const blobConfigured =
+    !!process.env.BLOB_STORE_ID || !!process.env.BLOB_READ_WRITE_TOKEN;
+  if (!blobConfigured) {
     return NextResponse.json({
       ranAt: new Date().toISOString(),
       stored: false,
-      reason: "BLOB_READ_WRITE_TOKEN not set — provision a Vercel Blob store",
+      reason: "Blob not configured — connect a Vercel Blob store (sets BLOB_STORE_ID)",
     });
   }
 
@@ -37,19 +42,18 @@ export async function GET(req: NextRequest) {
   const blob = await put(`${BLOB_PREFIX}${filename}`, json, {
     access: "private",
     contentType: "application/json",
-    token,
     addRandomSuffix: false,
     allowOverwrite: true,
   });
 
   // Retention: keep the newest N daily backups, delete the rest.
   const retentionDays = Number(process.env.BACKUP_RETENTION_DAYS) || 30;
-  const { blobs } = await list({ prefix: BLOB_PREFIX, token });
+  const { blobs } = await list({ prefix: BLOB_PREFIX });
   const sorted = [...blobs].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
   );
   const stale = sorted.slice(retentionDays);
-  if (stale.length) await del(stale.map((b) => b.url), { token });
+  if (stale.length) await del(stale.map((b) => b.url));
 
   // Weekly offsite copy: email the backup on Sundays.
   let email: ReminderEmailResult = { sent: false, reason: "not the weekly email day" };

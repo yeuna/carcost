@@ -63,10 +63,11 @@ Optional — for email service reminders (see below):
 
 Optional — for automatic backups (see *Durability & backups* below):
 
-| Variable                | What it is                                                       |
-| ----------------------- | ---------------------------------------------------------------- |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token; set automatically when you add a Blob store.  |
-| `BACKUP_RETENTION_DAYS` | How many daily backups to keep before pruning (default 30).      |
+| Variable                | What it is                                                              |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `BLOB_STORE_ID`         | Set automatically when you connect a Blob store; used with Vercel OIDC. |
+| `BLOB_READ_WRITE_TOKEN` | Optional static token instead of OIDC (e.g. non-Vercel hosts).          |
+| `BACKUP_RETENTION_DAYS` | How many daily backups to keep before pruning (default 30).             |
 
 Generate a good `AUTH_SECRET`:
 
@@ -178,9 +179,10 @@ single JSON file and stores it in **Vercel Blob**, keeping the most recent
 a copy to `NOTIFY_EMAIL` (via Resend), so an offsite copy lives in your inbox.
 
 - **Enable it:** in the **Vercel dashboard → Storage → Create → Blob**, create a store
-  and link it to the project. That sets `BLOB_READ_WRITE_TOKEN` automatically. Run
-  `vercel env pull` if you want scheduled backups to work locally too. Without the token,
-  the scheduled job is skipped (download/restore still work).
+  and connect it to the project. That sets `BLOB_STORE_ID`; on Vercel the job then
+  authenticates through the platform's OIDC token automatically — no static token to
+  manage. Run `vercel env pull` if you want scheduled backups to work locally too.
+  Without a connected store, the scheduled job is skipped (download/restore still work).
 - **Cost:** backups are small JSON (kilobytes), so this stays comfortably within the
   free Blob and Resend allowances.
 - **Test locally:** run `npm run dev`, then
