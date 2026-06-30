@@ -16,6 +16,13 @@ export function miles(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US").format(value) + " mi";
 }
 
+// Cost per mile is usually under a dollar, so show cents (e.g. "43.2¢/mi"),
+// falling back to dollars for higher figures.
+export function perMile(value: number): string {
+  if (value < 1) return `${(value * 100).toFixed(1)}¢/mi`;
+  return `${money(value)}/mi`;
+}
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value + "T00:00:00") : value;

@@ -3,7 +3,7 @@ import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MonthlySpendChart } from "@/components/MonthlySpendChart";
 import { getCars, getMonthlySpending, getRecurringInsuranceConfig } from "@/lib/queries";
-import { money, miles, ordinal } from "@/lib/utils";
+import { money, miles, ordinal, perMile } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +93,13 @@ export default async function Dashboard() {
                       <p className="mt-0.5 text-sm text-zinc-400">
                         {miles(car.currentOdometer)}
                       </p>
+                      {(car.costPerMile != null || car.avgPerMonth != null) && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {car.costPerMile != null && perMile(car.costPerMile)}
+                          {car.costPerMile != null && car.avgPerMonth != null && " · "}
+                          {car.avgPerMonth != null && `${money(car.avgPerMonth)}/mo`}
+                        </p>
+                      )}
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="text-lg font-semibold">{money(car.totalSpent)}</div>

@@ -17,6 +17,12 @@ cars. Built for a single user (you), password-protected, and hosted on Vercel.
   **due soon / overdue** based on your latest odometer reading.
 - **Fuel log** — record each fill-up's cost (and optional gallons to auto-calc
   **MPG** and **cost-per-mile**).
+- **Cost insights** — per car, an all-in **cost-per-mile** (maintenance + fuel +
+  insurance ÷ miles driven), an **average monthly** spend, and a **projected
+  yearly** cost, with a bar showing how each category contributes per mile. The
+  dashboard shows cost/mile and $/mo on every car so you can compare them.
+- **Fuel economy chart** — MPG over time per car, with average, best, and average
+  cost-per-gallon, so a slipping figure is easy to spot.
 - **Spend totals** — per car and broken down by maintenance vs. fuel.
 - **Password protected** — one password you set; you stay logged in on your phone.
 

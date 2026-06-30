@@ -38,6 +38,61 @@ export interface FuelWithMpg extends Fuel {
   costPerMile: number | null;
 }
 
+// All-in cost analytics for a car (every category, not just fuel).
+export interface CostStats {
+  milesDriven: number | null; // observed span of odometer readings
+  costPerMile: number | null; // total spend ÷ miles driven
+  monthsTracked: number; // calendar months from first record to today (min 1)
+  avgPerMonth: number | null; // total spend ÷ months tracked
+  projectedAnnual: number | null; // avgPerMonth × 12
+  breakdownPerMile: { maintenance: number; fuel: number; insurance: number } | null;
+}
+
+// Derive all-in cost metrics from a car's raw cost events. Miles driven is the
+// span between the lowest and highest odometer we've seen; months tracked runs
+// from the earliest dated record to today so $/mo reflects the full ownership
+// window rather than only months with activity.
+function computeCostStats(opts: {
+  totalSpent: number;
+  maintenanceSpent: number;
+  fuelSpent: number;
+  insuranceSpent: number;
+  odometers: number[];
+  dates: string[];
+}): CostStats {
+  const { totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, odometers, dates } = opts;
+
+  let milesDriven: number | null = null;
+  if (odometers.length >= 2) {
+    const min = Math.min(...odometers);
+    const max = Math.max(...odometers);
+    if (max > min) milesDriven = max - min;
+  }
+  const costPerMile = milesDriven ? totalSpent / milesDriven : null;
+  const breakdownPerMile = milesDriven
+    ? {
+        maintenance: maintenanceSpent / milesDriven,
+        fuel: fuelSpent / milesDriven,
+        insurance: insuranceSpent / milesDriven,
+      }
+    : null;
+
+  let monthsTracked = 1;
+  if (dates.length) {
+    const earliest = dates.reduce((a, b) => (a < b ? a : b));
+    const a = new Date(earliest + "T00:00:00");
+    const b = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
+    monthsTracked = Math.max(
+      1,
+      (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) + 1,
+    );
+  }
+  const avgPerMonth = totalSpent > 0 ? totalSpent / monthsTracked : null;
+  const projectedAnnual = avgPerMonth != null ? avgPerMonth * 12 : null;
+
+  return { milesDriven, costPerMile, monthsTracked, avgPerMonth, projectedAnnual, breakdownPerMile };
+}
+
 // Returns the account-level recurring insurance config (single row) with an
 // isDue flag indicating whether this month's payment needs to be recorded.
 export async function getRecurringInsuranceConfig(): Promise<
@@ -87,10 +142,29 @@ export async function getCarSummary(carId: number) {
 
   const currentOdometer = computeCurrentOdometer(maint, fuelRows, odometerRows);
 
-  let totalSpent = 0;
-  for (const m of maint) totalSpent += maintenanceTotal(m, itemsByMaint[m.id] ?? []);
-  for (const f of fuelRows) totalSpent += num(f.totalCost);
-  for (const ins of insuranceRows) totalSpent += num(ins.amount);
+  let maintenanceSpent = 0;
+  for (const m of maint) maintenanceSpent += maintenanceTotal(m, itemsByMaint[m.id] ?? []);
+  const fuelSpent = fuelRows.reduce((a, f) => a + num(f.totalCost), 0);
+  const insuranceSpent = insuranceRows.reduce((a, i) => a + num(i.amount), 0);
+  const totalSpent = maintenanceSpent + fuelSpent + insuranceSpent;
+
+  const stats = computeCostStats({
+    totalSpent,
+    maintenanceSpent,
+    fuelSpent,
+    insuranceSpent,
+    odometers: [
+      ...maint.map((m) => m.odometer),
+      ...fuelRows.map((f) => f.odometer),
+      ...odometerRows.map((o) => o.odometer),
+    ],
+    dates: [
+      ...maint.map((m) => m.date),
+      ...fuelRows.map((f) => f.date),
+      ...insuranceRows.map((i) => i.date),
+      ...odometerRows.map((o) => o.date),
+    ],
+  });
 
   const reminders = schedules.map((s) =>
     buildScheduleReminder(s, maint, currentOdometer),
@@ -103,6 +177,9 @@ export async function getCarSummary(carId: number) {
     totalSpent,
     maintenanceCount: maint.length,
     fuelCount: fuelRows.length,
+    costPerMile: stats.costPerMile,
+    avgPerMonth: stats.avgPerMonth,
+    milesDriven: stats.milesDriven,
     overdue,
     soon,
   };
@@ -150,6 +227,24 @@ export async function getCarDetail(carId: number) {
   const insuranceSpent = insuranceRows.reduce((a, i) => a + num(i.amount), 0);
   const totalSpent = maintenanceSpent + fuelSpent + insuranceSpent;
 
+  const stats = computeCostStats({
+    totalSpent,
+    maintenanceSpent,
+    fuelSpent,
+    insuranceSpent,
+    odometers: [
+      ...maint.map((m) => m.odometer),
+      ...fuelRows.map((f) => f.odometer),
+      ...odometerRows.map((o) => o.odometer),
+    ],
+    dates: [
+      ...maint.map((m) => m.date),
+      ...fuelRows.map((f) => f.date),
+      ...insuranceRows.map((i) => i.date),
+      ...odometerRows.map((o) => o.date),
+    ],
+  });
+
   return {
     car,
     currentOdometer,
@@ -157,6 +252,7 @@ export async function getCarDetail(carId: number) {
     maintenanceSpent,
     fuelSpent,
     insuranceSpent,
+    stats,
     maintenance: maintenanceList,
     fuel: fuelList,
     insurance: insuranceRows,

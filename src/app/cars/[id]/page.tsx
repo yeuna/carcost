@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
+import { CostInsights } from "@/components/CostInsights";
+import { FuelEconomyChart } from "@/components/FuelEconomyChart";
 import { getCarDetail } from "@/lib/queries";
 import {
   deleteFuel,
@@ -22,7 +24,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
   const data = await getCarDetail(carId);
   if (!data) notFound();
 
-  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, maintenance, fuel, insurance, schedules, odometerReadings } = data;
+  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, stats, maintenance, fuel, insurance, schedules, odometerReadings } = data;
 
   return (
     <>
@@ -50,6 +52,9 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
             <MiniStat label="Insurance" value={money(insuranceSpent)} />
           </div>
         </div>
+
+        {/* Cost analytics */}
+        <CostInsights stats={stats} />
 
         {/* Quick actions */}
         <div className="mt-5 grid grid-cols-5 gap-2">
@@ -164,6 +169,10 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
           {fuel.length === 0 ? (
             <Empty>No fill-ups logged yet.</Empty>
           ) : (
+            <>
+            <div className="mb-3">
+              <FuelEconomyChart fuel={fuel} />
+            </div>
             <ul className="space-y-2">
               {fuel.map((f) => (
                 <li
@@ -192,6 +201,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                 </li>
               ))}
             </ul>
+            </>
           )}
         </Section>
 
