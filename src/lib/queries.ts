@@ -1,4 +1,4 @@
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, isNull, and } from "drizzle-orm";
 import { db } from "./db";
 import {
   cars,
@@ -54,7 +54,11 @@ export async function getRecurringInsuranceConfig(): Promise<
 }
 
 export async function getCars() {
-  const allCars = await db.select().from(cars).orderBy(asc(cars.name));
+  const allCars = await db
+    .select()
+    .from(cars)
+    .where(isNull(cars.deletedAt))
+    .orderBy(asc(cars.name));
 
   // Enrich each car with current odometer, total spend, and reminder summary.
   const result = await Promise.all(
@@ -105,7 +109,11 @@ export async function getCarSummary(carId: number) {
 }
 
 export async function getCar(carId: number) {
-  const rows = await db.select().from(cars).where(eq(cars.id, carId)).limit(1);
+  const rows = await db
+    .select()
+    .from(cars)
+    .where(and(eq(cars.id, carId), isNull(cars.deletedAt)))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -238,7 +246,7 @@ export interface DueService {
 // All services currently due-soon or overdue across every car, with the
 // dedup fields needed to decide whether to email about them.
 export async function getDueServices(): Promise<DueService[]> {
-  const allCars = await db.select().from(cars);
+  const allCars = await db.select().from(cars).where(isNull(cars.deletedAt));
   const out: DueService[] = [];
 
   for (const car of allCars) {

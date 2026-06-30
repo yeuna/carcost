@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { getCarDetail } from "@/lib/queries";
 import {
-  deleteCar,
   deleteFuel,
   deleteInsurance,
   deleteMaintenance,
@@ -254,10 +254,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
 
         {/* Danger zone */}
         <div className="mt-12 border-t border-white/10 pt-6">
-          <form action={deleteCar}>
-            <input type="hidden" name="id" value={carId} />
-            <button className="text-sm text-red-400/80 active:text-red-400">Delete this car</button>
-          </form>
+          <ConfirmDelete carId={carId} carName={car.name} />
         </div>
       </main>
     </>

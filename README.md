@@ -61,6 +61,13 @@ Optional — for email service reminders (see below):
 | `CRON_SECRET`     | Random string protecting the cron endpoint (Vercel sends it for you). |
 | `APP_URL`         | Your deployed URL, used for the link button in emails.             |
 
+Optional — for automatic backups (see *Durability & backups* below):
+
+| Variable                | What it is                                                       |
+| ----------------------- | ---------------------------------------------------------------- |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token; set automatically when you add a Blob store.  |
+| `BACKUP_RETENTION_DAYS` | How many daily backups to keep before pruning (default 30).      |
+
 Generate a good `AUTH_SECRET`:
 
 ```bash
@@ -144,6 +151,50 @@ service schedules and emails you a digest of anything **due soon or overdue**.
 
 > Note: Vercel's Hobby (free) plan runs cron jobs once per day, which is exactly
 > what this uses.
+
+## Durability & backups
+
+This app is meant to be used for years, so your data is protected three ways.
+
+### 1. The live database (Neon)
+
+Neon stores your data redundantly and supports **point-in-time recovery**. After
+deploying, open your project in the **Neon dashboard → Settings → Storage** and set
+**history retention** to the longest window your plan allows (e.g. 7 days). That lets
+you rewind the whole database to any moment in that window if something goes wrong.
+
+### 2. Soft deletes
+
+Deleting a car no longer destroys its history. It is marked hidden (`cars.deleted_at`)
+and disappears from the app, but every maintenance, fuel, insurance, odometer, and
+schedule row is **kept** — and still included in backups. Deletion also requires typing
+the car's name to confirm, so an accidental tap can't wipe anything.
+
+### 3. Automatic off-database backups
+
+A daily cron job (`vercel.json` → `/api/cron/backup`) exports **every table** to a
+single JSON file and stores it in **Vercel Blob**, keeping the most recent
+`BACKUP_RETENTION_DAYS` (default 30) and pruning older ones. Every Sunday it also emails
+a copy to `NOTIFY_EMAIL` (via Resend), so an offsite copy lives in your inbox.
+
+- **Enable it:** in the **Vercel dashboard → Storage → Create → Blob**, create a store
+  and link it to the project. That sets `BLOB_READ_WRITE_TOKEN` automatically. Run
+  `vercel env pull` if you want scheduled backups to work locally too. Without the token,
+  the scheduled job is skipped (download/restore still work).
+- **Cost:** backups are small JSON (kilobytes), so this stays comfortably within the
+  free Blob and Resend allowances.
+- **Test locally:** run `npm run dev`, then
+  `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/backup`.
+
+### Download & restore
+
+From **Settings → Backups** you can:
+
+- **Download backup now** — saves a full `carcost-backup-YYYY-MM-DD.json` snapshot.
+- **Restore from backup** — upload a snapshot and type `RESTORE` to confirm. This
+  **replaces all current data** with the file's contents (ids and all), so it's a
+  recovery tool, not a merge. Restore into an empty or broken database — ideally a fresh
+  Neon branch first if you want to verify it.
 
 ## Useful scripts
 

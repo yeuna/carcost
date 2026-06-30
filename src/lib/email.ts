@@ -46,6 +46,58 @@ export async function sendServiceReminderEmail(
   return { sent: true };
 }
 
+// Email a backup JSON file as an attachment via Resend. Like the reminder email,
+// returns sent:false (with a reason) rather than throwing when email isn't
+// configured, so the backup cron job stays green.
+export async function sendBackupEmail(
+  json: string,
+  filename: string,
+): Promise<ReminderEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = process.env.NOTIFY_EMAIL;
+  const from = process.env.NOTIFY_FROM || "CarCost <onboarding@resend.dev>";
+
+  if (!apiKey) return { sent: false, reason: "RESEND_API_KEY not set" };
+  if (!to) return { sent: false, reason: "NOTIFY_EMAIL not set" };
+
+  const sizeKb = (Buffer.byteLength(json, "utf8") / 1024).toFixed(1);
+  const html = `
+  <div style="background:#09090b;padding:24px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+    <div style="max-width:560px;margin:0 auto;background:#18181b;border-radius:16px;padding:24px;border:1px solid #27272a;">
+      <div style="font-size:20px;font-weight:700;color:#fafafa;">🚗 CarCost backup</div>
+      <p style="color:#a1a1aa;font-size:14px;margin:8px 0 0;">
+        Your weekly data backup is attached (<strong>${esc(filename)}</strong>, ${esc(sizeKb)} KB).
+        Keep this email — it can be used to restore your data from the Settings page.
+      </p>
+    </div>
+  </div>`;
+  const text = `CarCost backup attached: ${filename} (${sizeKb} KB). Keep it to restore from Settings.`;
+
+  const res = await fetch(RESEND_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject: `🗄️ CarCost backup — ${filename}`,
+      html,
+      text,
+      attachments: [
+        { filename, content: Buffer.from(json, "utf8").toString("base64") },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    return { sent: false, reason: `Resend ${res.status}: ${body}` };
+  }
+  return { sent: true };
+}
+
 function renderEmail(overdue: DueService[], soon: DueService[]) {
   const appUrl = process.env.APP_URL || "";
 

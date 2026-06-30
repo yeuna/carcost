@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { num } from "./utils";
 import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings, recurringInsuranceConfig } from "./schema";
@@ -78,7 +78,7 @@ export async function saveRecurringConfig(form: FormData) {
 export async function recordInsurancePayment(_form: FormData) {
   const [configs, allCars] = await Promise.all([
     db.select().from(recurringInsuranceConfig).limit(1),
-    db.select().from(cars),
+    db.select().from(cars).where(isNull(cars.deletedAt)),
   ]);
   const cfg = configs[0];
   if (!cfg || !allCars.length) redirect("/");
@@ -135,7 +135,9 @@ export async function updateCar(form: FormData) {
 export async function deleteCar(form: FormData) {
   const id = optInt(form, "id");
   if (id == null) return;
-  await db.delete(cars).where(eq(cars.id, id));
+  // Soft delete: mark the row instead of cascading away all its history. The car
+  // disappears from the app but its data is preserved (and recoverable / in backups).
+  await db.update(cars).set({ deletedAt: new Date() }).where(eq(cars.id, id));
   revalidatePath("/");
   redirect("/");
 }

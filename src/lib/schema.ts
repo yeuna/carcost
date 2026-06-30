@@ -18,6 +18,9 @@ export const cars = pgTable("cars", {
   year: integer("year"),
   color: text("color"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Soft-delete marker: null = active, a timestamp = hidden but retained. Lets an
+  // accidental delete be undone and keeps history out of reports without losing data.
+  deletedAt: timestamp("deleted_at"),
 });
 
 // A maintenance event: either DIY (with line-item parts) or a dealer/shop visit (lump sum).
