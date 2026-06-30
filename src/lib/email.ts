@@ -1,4 +1,4 @@
-import type { DueService } from "./queries";
+import type { DueItem } from "./queries";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -10,7 +10,7 @@ export interface ReminderEmailResult {
 // Send a service-reminder digest via Resend. Returns sent:false (with a reason)
 // rather than throwing when email isn't configured, so the cron job stays green.
 export async function sendServiceReminderEmail(
-  items: DueService[],
+  items: DueItem[],
 ): Promise<ReminderEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.NOTIFY_EMAIL;
@@ -98,10 +98,10 @@ export async function sendBackupEmail(
   return { sent: true };
 }
 
-function renderEmail(overdue: DueService[], soon: DueService[]) {
+function renderEmail(overdue: DueItem[], soon: DueItem[]) {
   const appUrl = process.env.APP_URL || "";
 
-  const row = (i: DueService) =>
+  const row = (i: DueItem) =>
     `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #27272a;color:#fafafa;">
         <strong>${esc(i.carName)}</strong> — ${esc(i.name)}
@@ -111,7 +111,7 @@ function renderEmail(overdue: DueService[], soon: DueService[]) {
       </td>
     </tr>`;
 
-  const section = (title: string, color: string, list: DueService[]) =>
+  const section = (title: string, color: string, list: DueItem[]) =>
     list.length
       ? `<h2 style="font-size:15px;color:${color};margin:20px 0 6px;">${title}</h2>
          <table style="width:100%;border-collapse:collapse;">${list.map(row).join("")}</table>`

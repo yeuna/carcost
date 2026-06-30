@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
-import { num } from "./utils";
-import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings, recurringInsuranceConfig } from "./schema";
+import { num, addMonthsStr } from "./utils";
+import { cars, maintenance, maintenanceItems, fuel, insurance, serviceSchedules, odometerReadings, renewals, recurringInsuranceConfig } from "./schema";
 
 function str(form: FormData, key: string): string {
   return String(form.get(key) ?? "").trim();
@@ -416,6 +416,67 @@ export async function deleteServiceSchedule(form: FormData) {
   const carId = optInt(form, "carId");
   if (id == null) return;
   await db.delete(serviceSchedules).where(eq(serviceSchedules.id, id));
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+// --- Renewals (registration / inspection / tax) ---
+
+export async function createRenewal(form: FormData) {
+  const carId = optInt(form, "carId");
+  if (carId == null) throw new Error("Missing car");
+  const dueDate = str(form, "dueDate");
+  if (!dueDate) throw new Error("Due date is required");
+  await db.insert(renewals).values({
+    carId,
+    name: str(form, "name") || "Renewal",
+    dueDate,
+    intervalMonths: optInt(form, "intervalMonths"),
+    cost: optNum(form, "cost"),
+    notes: optStr(form, "notes"),
+  });
+  revalidatePath("/");
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+// Mark a renewal as just renewed. Recurring renewals advance their due date by
+// the interval (skipping any missed periods so the next date is in the future);
+// one-time renewals are removed once done.
+export async function markRenewalDone(form: FormData) {
+  const carId = optInt(form, "carId");
+  const id = optInt(form, "id");
+  if (carId == null || id == null) throw new Error("Missing data");
+
+  const rows = await db.select().from(renewals).where(eq(renewals.id, id)).limit(1);
+  const r = rows[0];
+  if (!r) redirect(`/cars/${carId}`);
+
+  if (r.intervalMonths && r.intervalMonths > 0) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let next = r.dueDate;
+    do {
+      next = addMonthsStr(next, r.intervalMonths);
+    } while (next <= todayStr);
+    await db
+      .update(renewals)
+      .set({ dueDate: next, notifiedStatus: null, notifiedAt: null })
+      .where(eq(renewals.id, id));
+  } else {
+    await db.delete(renewals).where(eq(renewals.id, id));
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/cars/${carId}`);
+  redirect(`/cars/${carId}`);
+}
+
+export async function deleteRenewal(form: FormData) {
+  const id = optInt(form, "id");
+  const carId = optInt(form, "carId");
+  if (id == null) return;
+  await db.delete(renewals).where(eq(renewals.id, id));
+  revalidatePath("/");
   revalidatePath(`/cars/${carId}`);
   redirect(`/cars/${carId}`);
 }

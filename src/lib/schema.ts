@@ -116,6 +116,25 @@ export const odometerReadings = pgTable("odometer_readings", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// A date-based recurring renewal: registration, emissions/safety inspection,
+// road tax, etc. Unlike serviceSchedules (mileage/time driven off the odometer),
+// these are anchored to a fixed calendar due date and advance by intervalMonths.
+export const renewals = pgTable("renewals", {
+  id: serial("id").primaryKey(),
+  carId: integer("car_id")
+    .notNull()
+    .references(() => cars.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g. "Registration", "Smog check"
+  dueDate: date("due_date").notNull(),
+  intervalMonths: integer("interval_months"), // recurrence; null = one-time
+  cost: numeric("cost", { precision: 10, scale: 2 }), // optional expected cost (reference only)
+  notes: text("notes"),
+  // Email-reminder de-duplication, mirroring serviceSchedules.
+  notifiedStatus: text("notified_status"), // 'soon' | 'overdue' | null
+  notifiedAt: timestamp("notified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Account-level recurring insurance config (single row). The monthly payment
 // covers all cars; the due-day prompt appears once per month on or after dayOfMonth.
 // lastPaidMonth ("YYYY-MM") tracks whether this month's payment has been recorded.
@@ -143,4 +162,5 @@ export type Fuel = typeof fuel.$inferSelect;
 export type Insurance = typeof insurance.$inferSelect;
 export type ServiceSchedule = typeof serviceSchedules.$inferSelect;
 export type OdometerReading = typeof odometerReadings.$inferSelect;
+export type Renewal = typeof renewals.$inferSelect;
 export type RecurringInsuranceConfig = typeof recurringInsuranceConfig.$inferSelect;

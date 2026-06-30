@@ -12,7 +12,9 @@ import {
   deleteMaintenance,
   deleteOdometerReading,
   deleteServiceSchedule,
+  deleteRenewal,
   markServiceDone,
+  markRenewalDone,
 } from "@/lib/actions";
 import { money, miles, formatDate, num } from "@/lib/utils";
 
@@ -24,7 +26,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
   const data = await getCarDetail(carId);
   if (!data) notFound();
 
-  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, stats, maintenance, fuel, insurance, schedules, odometerReadings } = data;
+  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, stats, maintenance, fuel, insurance, schedules, renewals, odometerReadings } = data;
 
   return (
     <>
@@ -57,11 +59,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
         <CostInsights stats={stats} />
 
         {/* Quick actions */}
-        <div className="mt-5 grid grid-cols-5 gap-2">
+        <div className="mt-5 grid grid-cols-3 gap-2">
           <Action href={`/cars/${carId}/maintenance/new`} icon="🔧" label="Maintenance" />
           <Action href={`/cars/${carId}/fuel/new`} icon="⛽" label="Fuel" />
           <Action href={`/cars/${carId}/insurance/new`} icon="🛡️" label="Insurance" />
           <Action href={`/cars/${carId}/services/new`} icon="🗓️" label="Service" />
+          <Action href={`/cars/${carId}/renewals/new`} icon="📋" label="Renewal" />
           <Action href={`/cars/${carId}/odometer/new`} icon="📍" label="Odometer" />
         </div>
 
@@ -103,6 +106,51 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     </form>
                     <form action={deleteServiceSchedule}>
                       <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="carId" value={carId} />
+                      <button className="text-xs text-zinc-600 active:text-red-400">Delete</button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        {/* Renewals */}
+        <Section title="Renewals" action={{ href: `/cars/${carId}/renewals/new`, label: "+ Add" }}>
+          {renewals.length === 0 ? (
+            <Empty>No renewals tracked. Add registration, inspection, or tax due dates.</Empty>
+          ) : (
+            <ul className="space-y-2">
+              {renewals.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-start justify-between gap-3 rounded-xl bg-zinc-900 p-3 ring-1 ring-white/10"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium">{r.name}</span>
+                      <StatusBadge status={r.reminder.status} />
+                    </div>
+                    <div className="mt-0.5 text-xs text-zinc-400">
+                      Due {formatDate(r.dueDate)} · {r.reminder.label}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {r.intervalMonths ? `every ${r.intervalMonths} mo` : "one-time"}
+                      {num(r.cost) > 0 && ` · ${money(r.cost)}`}
+                    </div>
+                    {r.notes && <p className="mt-1 text-xs text-zinc-500">{r.notes}</p>}
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end gap-2">
+                    <form action={markRenewalDone}>
+                      <input type="hidden" name="carId" value={carId} />
+                      <input type="hidden" name="id" value={r.id} />
+                      <button className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-white/10 active:bg-zinc-700">
+                        ✓ Renewed
+                      </button>
+                    </form>
+                    <form action={deleteRenewal}>
+                      <input type="hidden" name="id" value={r.id} />
                       <input type="hidden" name="carId" value={carId} />
                       <button className="text-xs text-zinc-600 active:text-red-400">Delete</button>
                     </form>

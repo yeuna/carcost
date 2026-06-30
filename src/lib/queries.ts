@@ -8,15 +8,23 @@ import {
   insurance,
   serviceSchedules,
   odometerReadings,
+  renewals,
   recurringInsuranceConfig,
   type Maintenance,
   type MaintenanceItem,
   type Fuel,
   type Insurance,
   type OdometerReading,
+  type Renewal,
   type RecurringInsuranceConfig,
 } from "./schema";
-import { computeReminder, num, type Reminder } from "./utils";
+import {
+  computeReminder,
+  computeRenewalReminder,
+  num,
+  type Reminder,
+  type RenewalReminder,
+} from "./utils";
 
 export interface MaintenanceWithItems extends Maintenance {
   items: MaintenanceItem[];
@@ -36,6 +44,10 @@ export interface ScheduleWithReminder {
 export interface FuelWithMpg extends Fuel {
   mpg: number | null;
   costPerMile: number | null;
+}
+
+export interface RenewalWithReminder extends Renewal {
+  reminder: RenewalReminder;
 }
 
 // All-in cost analytics for a car (every category, not just fuel).
@@ -127,12 +139,13 @@ export async function getCars() {
 
 // Lightweight summary used on the dashboard.
 export async function getCarSummary(carId: number) {
-  const [maint, fuelRows, insuranceRows, schedules, odometerRows] = await Promise.all([
+  const [maint, fuelRows, insuranceRows, schedules, odometerRows, renewalRows] = await Promise.all([
     db.select().from(maintenance).where(eq(maintenance.carId, carId)),
     db.select().from(fuel).where(eq(fuel.carId, carId)),
     db.select().from(insurance).where(eq(insurance.carId, carId)),
     db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, carId)),
     db.select().from(odometerReadings).where(eq(odometerReadings.carId, carId)),
+    db.select().from(renewals).where(eq(renewals.carId, carId)),
   ]);
 
   const items = maint.length
@@ -169,8 +182,13 @@ export async function getCarSummary(carId: number) {
   const reminders = schedules.map((s) =>
     buildScheduleReminder(s, maint, currentOdometer),
   );
-  const overdue = reminders.filter((r) => r.reminder.status === "overdue").length;
-  const soon = reminders.filter((r) => r.reminder.status === "soon").length;
+  const renewalReminders = renewalRows.map((r) => computeRenewalReminder(r.dueDate));
+  const statuses = [
+    ...reminders.map((r) => r.reminder.status),
+    ...renewalReminders.map((r) => r.status),
+  ];
+  const overdue = statuses.filter((s) => s === "overdue").length;
+  const soon = statuses.filter((s) => s === "soon").length;
 
   return {
     currentOdometer,
@@ -198,13 +216,14 @@ export async function getCarDetail(carId: number) {
   const car = await getCar(carId);
   if (!car) return null;
 
-  const [maint, fuelRows, insuranceRows, schedules, allItems, odometerRows] = await Promise.all([
+  const [maint, fuelRows, insuranceRows, schedules, allItems, odometerRows, renewalRows] = await Promise.all([
     db.select().from(maintenance).where(eq(maintenance.carId, carId)).orderBy(desc(maintenance.date), desc(maintenance.odometer)),
     db.select().from(fuel).where(eq(fuel.carId, carId)).orderBy(desc(fuel.date), desc(fuel.odometer)),
     db.select().from(insurance).where(eq(insurance.carId, carId)).orderBy(desc(insurance.date)),
     db.select().from(serviceSchedules).where(eq(serviceSchedules.carId, carId)).orderBy(asc(serviceSchedules.name)),
     db.select().from(maintenanceItems),
     db.select().from(odometerReadings).where(eq(odometerReadings.carId, carId)).orderBy(desc(odometerReadings.date), desc(odometerReadings.odometer)),
+    db.select().from(renewals).where(eq(renewals.carId, carId)).orderBy(asc(renewals.dueDate)),
   ]);
 
   const itemsByMaint = groupItems(allItems);
@@ -221,6 +240,11 @@ export async function getCarDetail(carId: number) {
   const scheduleList = schedules.map((s) =>
     buildScheduleReminder(s, maint, currentOdometer),
   );
+
+  const renewalList: RenewalWithReminder[] = renewalRows.map((r) => ({
+    ...r,
+    reminder: computeRenewalReminder(r.dueDate),
+  }));
 
   const maintenanceSpent = maintenanceList.reduce((a, m) => a + m.total, 0);
   const fuelSpent = fuelRows.reduce((a, f) => a + num(f.totalCost), 0);
@@ -257,6 +281,7 @@ export async function getCarDetail(carId: number) {
     fuel: fuelList,
     insurance: insuranceRows,
     schedules: scheduleList,
+    renewals: renewalList,
     odometerReadings: odometerRows,
   };
 }
@@ -328,13 +353,25 @@ function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export interface DueService {
-  scheduleId: number;
-  carId: number;
+// The minimal shape the reminder email renders. Both due services and due
+// renewals satisfy it, so the email digest can mix them.
+export interface DueItem {
   carName: string;
   name: string;
   status: "soon" | "overdue";
   label: string;
+}
+
+export interface DueService extends DueItem {
+  scheduleId: number;
+  carId: number;
+  notifiedStatus: string | null;
+  notifiedAt: Date | null;
+}
+
+export interface DueRenewal extends DueItem {
+  renewalId: number;
+  carId: number;
   notifiedStatus: string | null;
   notifiedAt: Date | null;
 }
@@ -371,6 +408,57 @@ export async function getDueServices(): Promise<DueService[]> {
     }
   }
   return out;
+}
+
+// All renewals currently due-soon or overdue across every car, with the dedup
+// fields needed to decide whether to email about them.
+export async function getDueRenewals(): Promise<DueRenewal[]> {
+  const allCars = await db.select().from(cars).where(isNull(cars.deletedAt));
+  const carName: Record<number, string> = {};
+  for (const c of allCars) carName[c.id] = c.name;
+
+  const rows = await db.select().from(renewals);
+  const out: DueRenewal[] = [];
+  for (const r of rows) {
+    if (!(r.carId in carName)) continue; // skip soft-deleted cars
+    const reminder = computeRenewalReminder(r.dueDate);
+    if (reminder.status === "soon" || reminder.status === "overdue") {
+      out.push({
+        renewalId: r.id,
+        carId: r.carId,
+        carName: carName[r.carId],
+        name: r.name,
+        status: reminder.status,
+        label: reminder.label,
+        notifiedStatus: r.notifiedStatus,
+        notifiedAt: r.notifiedAt,
+      });
+    }
+  }
+  return out;
+}
+
+export async function markRenewalNotified(renewalId: number, status: string) {
+  await db
+    .update(renewals)
+    .set({ notifiedStatus: status, notifiedAt: new Date() })
+    .where(eq(renewals.id, renewalId));
+}
+
+// Clear the notified flag for any renewal that is no longer due, so a future
+// due event triggers a fresh email.
+export async function clearStaleRenewalNotifications(dueRenewalIds: number[]) {
+  const all = await db
+    .select({ id: renewals.id, notifiedStatus: renewals.notifiedStatus })
+    .from(renewals);
+  for (const r of all) {
+    if (r.notifiedStatus && !dueRenewalIds.includes(r.id)) {
+      await db
+        .update(renewals)
+        .set({ notifiedStatus: null, notifiedAt: null })
+        .where(eq(renewals.id, r.id));
+    }
+  }
 }
 
 export async function getMaintenanceEntry(id: number): Promise<MaintenanceWithItems | null> {

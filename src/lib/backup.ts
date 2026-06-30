@@ -8,6 +8,7 @@ import {
   insurance,
   serviceSchedules,
   odometerReadings,
+  renewals,
   recurringInsuranceConfig,
 } from "./schema";
 
@@ -32,6 +33,7 @@ type TableName =
   | "fuel"
   | "insurance"
   | "odometerReadings"
+  | "renewals"
   | "recurringInsuranceConfig";
 
 // Ordered parent-before-child so inserts satisfy foreign keys on restore.
@@ -45,6 +47,7 @@ const TABLES = [
   { name: "fuel", table: fuel, timestamps: ["createdAt"] },
   { name: "insurance", table: insurance, timestamps: ["createdAt"] },
   { name: "odometerReadings", table: odometerReadings, timestamps: ["createdAt"] },
+  { name: "renewals", table: renewals, timestamps: ["notifiedAt", "createdAt"] },
   { name: "recurringInsuranceConfig", table: recurringInsuranceConfig, timestamps: ["updatedAt"] },
 ] as const;
 
@@ -133,6 +136,7 @@ function quotedTable(name: TableName): string {
     fuel: "fuel",
     insurance: "insurance",
     odometerReadings: "odometer_readings",
+    renewals: "renewals",
     recurringInsuranceConfig: "recurring_insurance_config",
   };
   return map[name];

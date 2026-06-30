@@ -92,7 +92,8 @@ export default async function SettingsPage({
         <section className="border-t border-white/10 pt-8">
           <h2 className="mb-1 text-base font-semibold">Service email reminders</h2>
           <p className="mb-4 text-sm text-zinc-400">
-            A daily check sends you an email when a scheduled service is coming due or overdue.
+            A daily check sends you an email when a scheduled service or a renewal
+            (registration, inspection, tax) is coming due or overdue.
           </p>
           <div className="rounded-xl bg-zinc-900/60 px-4 py-4 text-sm ring-1 ring-white/5">
             {emailReady ? (
