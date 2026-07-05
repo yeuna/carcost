@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { CostInsights } from "@/components/CostInsights";
 import { FuelEconomyChart } from "@/components/FuelEconomyChart";
 import { getCarDetail } from "@/lib/queries";
@@ -107,7 +108,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     <form action={deleteServiceSchedule}>
                       <input type="hidden" name="id" value={s.id} />
                       <input type="hidden" name="carId" value={carId} />
-                      <button className="text-xs text-zinc-600 active:text-red-400">Delete</button>
+                      <ConfirmSubmitButton
+                        message={`Delete the "${s.name}" service schedule? This can't be undone.`}
+                        className="text-xs text-zinc-600 active:text-red-400"
+                      >
+                        Delete
+                      </ConfirmSubmitButton>
                     </form>
                   </div>
                 </li>
@@ -152,7 +158,12 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     <form action={deleteRenewal}>
                       <input type="hidden" name="id" value={r.id} />
                       <input type="hidden" name="carId" value={carId} />
-                      <button className="text-xs text-zinc-600 active:text-red-400">Delete</button>
+                      <ConfirmSubmitButton
+                        message={`Delete the "${r.name}" renewal? This can't be undone.`}
+                        className="text-xs text-zinc-600 active:text-red-400"
+                      >
+                        Delete
+                      </ConfirmSubmitButton>
                     </form>
                   </div>
                 </li>
@@ -202,6 +213,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                         action={deleteMaintenance}
                         id={m.id}
                         carId={carId}
+                        what="maintenance entry"
                         editHref={`/cars/${carId}/maintenance/${m.id}/edit`}
                       />
                     </div>
@@ -214,9 +226,15 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
 
         {/* Fuel log */}
         <Section title="Fuel log" action={{ href: `/cars/${carId}/fuel/new`, label: "+ Add" }}>
-          {avgMpg != null && (
+          {avgMpg != null ? (
             <p className="mb-2 text-xs text-zinc-500">
               Average {avgMpg.toFixed(1)} mpg across full fill-ups
+            </p>
+          ) : (
+            <p className="mb-2 rounded-xl bg-zinc-900/50 p-3 text-xs text-zinc-500 ring-1 ring-white/5">
+              MPG appears once you&apos;ve logged two <span className="text-zinc-400">full</span> fill-ups
+              (fill until the pump clicks off). No need to run the tank low — a full tank is just the
+              reference point, and partial fills in between still count.
             </p>
           )}
           {fuel.length === 0 ? (
@@ -249,6 +267,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     action={deleteFuel}
                     id={f.id}
                     carId={carId}
+                    what="fill-up"
                     editHref={`/cars/${carId}/fuel/${f.id}/edit`}
                   />
                 </li>
@@ -286,6 +305,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     action={deleteInsurance}
                     id={ins.id}
                     carId={carId}
+                    what="insurance payment"
                     editHref={`/cars/${carId}/insurance/${ins.id}/edit`}
                   />
                 </li>
@@ -308,7 +328,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
                     <div className="mt-0.5 text-xs text-zinc-400">{formatDate(o.date)}</div>
                     {o.notes && <p className="mt-1 text-xs text-zinc-500">{o.notes}</p>}
                   </div>
-                  <DeleteButton action={deleteOdometerReading} id={o.id} carId={carId} />
+                  <DeleteButton action={deleteOdometerReading} id={o.id} carId={carId} what="odometer reading" />
                 </li>
               ))}
             </ul>
@@ -381,11 +401,13 @@ function DeleteButton({
   action,
   id,
   carId,
+  what,
   editHref,
 }: {
   action: (form: FormData) => void;
   id: number;
   carId: number;
+  what: string; // e.g. "fill-up" — used in the confirmation prompt
   editHref?: string;
 }) {
   return (
@@ -398,9 +420,13 @@ function DeleteButton({
       <form action={action}>
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="carId" value={carId} />
-        <button className="text-xs text-zinc-600 active:text-red-400" aria-label="Delete">
+        <ConfirmSubmitButton
+          message={`Delete this ${what}? This can't be undone.`}
+          className="text-xs text-zinc-600 active:text-red-400"
+          ariaLabel="Delete"
+        >
           Delete
-        </button>
+        </ConfirmSubmitButton>
       </form>
     </div>
   );
