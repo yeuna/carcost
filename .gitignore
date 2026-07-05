@@ -11,6 +11,7 @@ npm-debug.log*
 next-env.d.ts
 /drizzle/meta
 .drizzle
+*.tsbuildinfo
 
 # local editor / tooling
 .claude/settings.local.json
