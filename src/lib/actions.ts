@@ -20,11 +20,11 @@ function optInt(form: FormData, key: string): number | null {
   const n = parseInt(v.replace(/[^0-9-]/g, ""), 10);
   return isNaN(n) ? null : n;
 }
-function optNum(form: FormData, key: string): string | null {
+function optNum(form: FormData, key: string, digits = 2): string | null {
   const v = str(form, key);
   if (v === "") return null;
   const n = parseFloat(v.replace(/[^0-9.-]/g, ""));
-  return isNaN(n) ? null : n.toFixed(2);
+  return isNaN(n) ? null : n.toFixed(digits);
 }
 
 // --- Cars ---
@@ -268,7 +268,7 @@ export async function createFuel(form: FormData) {
     carId,
     date: str(form, "date"),
     odometer: optInt(form, "odometer") ?? 0,
-    gallons: optNum(form, "gallons"),
+    gallons: optNum(form, "gallons", 3),
     totalCost: optNum(form, "totalCost") ?? "0.00",
     partialFill: str(form, "partialFill") === "on",
     notes: optStr(form, "notes"),
@@ -286,7 +286,7 @@ export async function updateFuel(form: FormData) {
     .set({
       date: str(form, "date"),
       odometer: optInt(form, "odometer") ?? 0,
-      gallons: optNum(form, "gallons"),
+      gallons: optNum(form, "gallons", 3),
       totalCost: optNum(form, "totalCost") ?? "0.00",
       partialFill: str(form, "partialFill") === "on",
       notes: optStr(form, "notes"),

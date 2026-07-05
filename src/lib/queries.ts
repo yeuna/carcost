@@ -235,7 +235,7 @@ export async function getCarDetail(carId: number) {
     total: maintenanceTotal(m, itemsByMaint[m.id] ?? []),
   }));
 
-  const fuelList = withMpg(fuelRows);
+  const { list: fuelList, avgMpg } = withMpg(fuelRows);
 
   const scheduleList = schedules.map((s) =>
     buildScheduleReminder(s, maint, currentOdometer),
@@ -277,6 +277,7 @@ export async function getCarDetail(carId: number) {
     fuelSpent,
     insuranceSpent,
     stats,
+    avgMpg,
     maintenance: maintenanceList,
     fuel: fuelList,
     insurance: insuranceRows,
@@ -566,30 +567,58 @@ function buildScheduleReminder(
   };
 }
 
-// Compute MPG and cost/mile for each fill-up based on the previous (lower-odometer) fill-up.
-function withMpg(fuelRows: Fuel[]): FuelWithMpg[] {
-  // Sort ascending by odometer to compute deltas.
-  const asc = [...fuelRows].sort((a, b) => a.odometer - b.odometer);
-  const mpgById: Record<number, { mpg: number | null; cpm: number | null }> = {};
-  for (let i = 1; i < asc.length; i++) {
-    const prev = asc[i - 1];
-    const cur = asc[i];
-    const dist = cur.odometer - prev.odometer;
-    const gals = num(cur.gallons);
-    if (dist > 0 && gals > 0 && !cur.partialFill) {
-      mpgById[cur.id] = {
-        mpg: dist / gals,
-        cpm: num(cur.totalCost) / dist,
-      };
-    } else if (dist > 0) {
-      mpgById[cur.id] = { mpg: null, cpm: num(cur.totalCost) / dist };
-    } else {
-      mpgById[cur.id] = { mpg: null, cpm: null };
+// Compute MPG and cost/mile using windows between full fill-ups (the tank
+// method). A full tank is the only fuel level you can reliably reproduce, so
+// full fills act as anchors: every gallon added between one full fill and the
+// next — partial fills included — was burned over that distance. Partials
+// therefore no longer break the calculation; they just fold into the next
+// full fill's number. avgMpg is total window distance / total window gallons.
+function withMpg(fuelRows: Fuel[]): { list: FuelWithMpg[]; avgMpg: number | null } {
+  const sorted = [...fuelRows].sort(
+    (a, b) => a.odometer - b.odometer || a.date.localeCompare(b.date),
+  );
+  const statsById: Record<number, { mpg: number; cpm: number }> = {};
+
+  let anchor: Fuel | null = null; // last full fill (tank level known)
+  let windowGallons = 0;
+  let windowCost = 0;
+  let windowValid = true; // false once a fill in the window is missing gallons
+  let totalDist = 0;
+  let totalGallons = 0;
+
+  for (const cur of sorted) {
+    if (anchor) {
+      const gals = num(cur.gallons);
+      if (gals > 0) {
+        windowGallons += gals;
+        windowCost += num(cur.totalCost);
+      } else {
+        windowValid = false;
+      }
+      const dist = cur.odometer - anchor.odometer;
+      if (!cur.partialFill && windowValid && dist > 0 && windowGallons > 0) {
+        statsById[cur.id] = {
+          mpg: dist / windowGallons,
+          cpm: windowCost / dist,
+        };
+        totalDist += dist;
+        totalGallons += windowGallons;
+      }
+    }
+    if (!cur.partialFill) {
+      // Full fill: tank level is known again, so a new window starts here
+      // even if this one couldn't be scored (e.g. missing gallons).
+      anchor = cur;
+      windowGallons = 0;
+      windowCost = 0;
+      windowValid = true;
     }
   }
-  return fuelRows.map((f) => ({
+
+  const list = fuelRows.map((f) => ({
     ...f,
-    mpg: mpgById[f.id]?.mpg ?? null,
-    costPerMile: mpgById[f.id]?.cpm ?? null,
+    mpg: statsById[f.id]?.mpg ?? null,
+    costPerMile: statsById[f.id]?.cpm ?? null,
   }));
+  return { list, avgMpg: totalGallons > 0 ? totalDist / totalGallons : null };
 }

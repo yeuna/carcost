@@ -41,7 +41,9 @@ export default async function NewFuelPage({ params }: { params: Promise<{ id: st
 
           <label className="flex items-center gap-3 rounded-xl bg-zinc-900 px-4 py-3 ring-1 ring-white/10">
             <input type="checkbox" name="partialFill" className="h-5 w-5 accent-blue-600" />
-            <span className="text-sm text-zinc-300">Partial fill (don’t use for MPG)</span>
+            <span className="text-sm text-zinc-300">
+              Partial fill — didn’t fill the tank (still counts toward the next full fill’s MPG)
+            </span>
           </label>
 
           <Field label="Notes (optional)">

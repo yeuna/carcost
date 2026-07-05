@@ -79,7 +79,9 @@ export default async function EditFuelPage({
               defaultChecked={entry.partialFill}
               className="h-5 w-5 accent-blue-600"
             />
-            <span className="text-sm text-zinc-300">Partial fill (don&apos;t use for MPG)</span>
+            <span className="text-sm text-zinc-300">
+              Partial fill — didn&apos;t fill the tank (still counts toward the next full fill&apos;s MPG)
+            </span>
           </label>
 
           <Field label="Notes (optional)">

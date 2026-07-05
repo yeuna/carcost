@@ -26,7 +26,7 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
   const data = await getCarDetail(carId);
   if (!data) notFound();
 
-  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, stats, maintenance, fuel, insurance, schedules, renewals, odometerReadings } = data;
+  const { car, currentOdometer, totalSpent, maintenanceSpent, fuelSpent, insuranceSpent, stats, avgMpg, maintenance, fuel, insurance, schedules, renewals, odometerReadings } = data;
 
   return (
     <>
@@ -214,6 +214,11 @@ export default async function CarPage({ params }: { params: Promise<{ id: string
 
         {/* Fuel log */}
         <Section title="Fuel log" action={{ href: `/cars/${carId}/fuel/new`, label: "+ Add" }}>
+          {avgMpg != null && (
+            <p className="mb-2 text-xs text-zinc-500">
+              Average {avgMpg.toFixed(1)} mpg across full fill-ups
+            </p>
+          )}
           {fuel.length === 0 ? (
             <Empty>No fill-ups logged yet.</Empty>
           ) : (
